@@ -4,6 +4,8 @@ Minimalist pixel sorter inspired by powdertoy and use of pixel sorting in glitch
 
 Each color gets assigned a weight, then they get sorted by gravity
 
+You can define a custom mask and only have the selected shape sorted or vice versa
+
 You can use it [here!](https://marcelwo4jedynki.github.io/pixel-sort/)
 
 <img width="2558" height="1270" alt="image" src="https://github.com/user-attachments/assets/587a8580-11f7-4314-a7cf-6c2705a2adad" />
