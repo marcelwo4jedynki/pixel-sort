@@ -56,11 +56,11 @@
 
     <!-- Header -->
     <header class="flex justify-between items-center px-6 py-4 border-b-2 border-black z-30 bg-white">
-        <h1 class="text-xl font-bold tracking-tighter uppercase">Real Time Pixel Sorter <span class="text-xs font-normal opacity-50 ml-2">v2.8 Gravity</span></h1>
+        <h1 class="text-xl font-bold tracking-tighter uppercase">Real Time Pixel Sorter <span class="text-xs font-normal opacity-50 ml-2">v2.9.1 Endless</span></h1>
         
         <!-- Status & Stats Tooltip Container -->
         <div class="relative tooltip-trigger cursor-help py-2">
-            <div class="text-xs font-bold bg-black text-white px-2 py-1 uppercase tracking-wider" id="status-text">WAITING FOR IMAGE</div>
+            <div class="text-xs font-bold bg-black text-white px-2 py-1 uppercase tracking-wider transition-colors" id="status-text">WAITING FOR IMAGE</div>
             
             <!-- Tooltip Content -->
             <div class="tooltip-content hidden absolute top-full right-0 mt-2 w-64 bg-white border-2 border-black shadow-xl p-4 z-50 text-left pointer-events-none">
@@ -181,6 +181,9 @@
                 <button id="btn-reset" class="px-6 py-2 border-2 border-black uppercase text-sm font-bold hover:bg-black hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled>
                     Reset
                 </button>
+                <button id="btn-use-input" class="px-6 py-2 border-2 border-black uppercase text-sm font-bold hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" title="Use current result as input for new sorts" disabled>
+                    Use as Input
+                </button>
                 <div class="w-px bg-gray-300 mx-2"></div>
                 <button id="btn-sort" class="px-6 py-2 border-2 border-black uppercase text-sm font-bold hover:bg-black hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled>
                     Start Sort
@@ -230,6 +233,7 @@
         const btnSort = document.getElementById('btn-sort');
         const btnRecord = document.getElementById('btn-record');
         const btnReset = document.getElementById('btn-reset');
+        const btnUseInput = document.getElementById('btn-use-input');
         const btnDownload = document.getElementById('btn-download');
         const btnFullscreen = document.getElementById('btn-fullscreen');
         const btnZoomToggle = document.getElementById('btn-zoom-toggle');
@@ -387,6 +391,8 @@
                 resetCanvasState();
             }
         });
+        
+        btnUseInput.addEventListener('click', setAsInput);
 
         btnConfirmReset.addEventListener('click', () => {
             confirmResetDialog.classList.add('hidden');
@@ -452,6 +458,47 @@
                 initCanvas(img, false);
             }
         }
+        
+        // --- Endless Sorting Logic ---
+        
+        function setAsInput() {
+            if (!width || !height) return;
+            
+            // 1. Snapshot Current Canvas State
+            const dataURL = canvas.toDataURL();
+            
+            // 2. Stop any current sorting nicely
+            if (isSorting) {
+                isSorting = false;
+                cancelAnimationFrame(animationId);
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    mediaRecorder.onstop = null;
+                    mediaRecorder.stop();
+                }
+                btnSort.disabled = false;
+                btnRecord.disabled = false;
+            }
+            
+            // 3. Update Original Image
+            const newImg = new Image();
+            newImg.onload = () => {
+                originalImage = newImg;
+                
+                // Immediately reset to prepare for new run
+                resetCanvasState();
+
+                // Visual Feedback
+                statusText.textContent = "IMAGE UPDATED AS INPUT";
+                statusText.classList.add('bg-blue-600', 'text-white');
+                setTimeout(() => {
+                    if (!isSorting && statusText.textContent === "IMAGE UPDATED AS INPUT") {
+                        statusText.textContent = "READY";
+                        statusText.classList.remove('bg-blue-600', 'text-white');
+                    }
+                }, 1500);
+            };
+            newImg.src = dataURL;
+        }
 
         // --- Zoom Logic ---
 
@@ -507,6 +554,7 @@
             
             btnSort.disabled = false;
             btnRecord.disabled = false;
+            btnUseInput.disabled = false;
             
             progressBar.style.width = '0%';
             progressBar.classList.remove('bg-green-500');
@@ -518,7 +566,7 @@
             statRender.textContent = "--";
             statFps.textContent = "--";
             
-            // Restore Original Image
+            // Restore Original Image (This might be the new input if updated!)
             if (width && height && originalImage) {
                 ctx.drawImage(originalImage, 0, 0, width, height);
                 const newData = ctx.getImageData(0, 0, width, height);
@@ -569,6 +617,7 @@
             btnRecord.disabled = false;
             btnReset.disabled = false;
             btnDownload.disabled = true;
+            btnUseInput.disabled = false;
             
             // Ensure we start in fit mode
             viewMode = 'fit';
@@ -640,6 +689,7 @@
             btnSort.disabled = true;
             btnRecord.disabled = true;
             btnReset.disabled = false; // Reset enabled for interrupt
+            btnUseInput.disabled = false; // Allow "Use as Input" during sort to capture intermediate state
             btnDownload.disabled = true;
             
             // Get Mode & Gravity
