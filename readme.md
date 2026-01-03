@@ -13,13 +13,13 @@ You can use it [here!](https://marcelwo4jedynki.github.io/pixel-sort/)
 
 * **Alternating Gravity**: Physics toggle between vertical and horizontal passes every frame to ensure complex 2D gradients.
 
+* **Artist Mode**: The user can now select custom masks to whitelist/blacklist parts of image to be sorted. 
+
 * **Resolution Handling**: Supports up to 4K images with workspace size detection that suggests optimal scaling for real-time performance.
 
 * **High-Fidelity Recording**: Generates "Pure" WebM files at up to 80Mbps bitrate to eliminate compression artifacts.
 
-* **Smart Color Sorting**: Uses a specialized (Value + Hue Bias) weight formula to prevent thick sediment layers and create clean color transitions.
-
-* **Process Statistics**: Live tracking of render times, average frame duration, and estimated FPS.
+* **Color Space Selection**: Lets the user select which color space dictates the weight of the pixels.
 
 ## Usage
 
