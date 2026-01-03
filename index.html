@@ -83,7 +83,7 @@
         <!-- Main Title Row -->
         <div class="flex justify-between items-center px-4 sm:px-6 py-3 sm:py-4">
             <div class="flex items-center gap-3 overflow-hidden">
-                <h1 class="text-lg sm:text-xl font-bold tracking-tighter uppercase truncate">Real Time Pixel Sorter <span class="hidden sm:inline text-xs font-normal opacity-50 ml-2">v3.8 Artist Mode</span></h1>
+                <h1 class="text-lg sm:text-xl font-bold tracking-tighter uppercase truncate">Real Time Pixel Sorter <span class="hidden sm:inline text-xs font-normal opacity-50 ml-2">v3.9 Artist Mode</span></h1>
                 <a href="https://github.com/marcelwo4jedynki/pixel-sort" target="_blank" class="text-gray-400 hover:text-black transition-colors shrink-0" title="View Source on GitHub">
                     <i data-lucide="github" class="w-5 h-5"></i>
                 </a>
@@ -419,6 +419,12 @@
 
             <!-- Bottom Row: Buttons -->
             <div class="flex flex-wrap gap-2 sm:gap-3 justify-center items-center">
+                <button id="btn-new-image" class="px-6 py-2 bg-black text-white border-2 border-black uppercase text-xs font-bold hover:bg-white hover:text-black transition-colors shadow-lg" title="Load New Image">
+                    <i data-lucide="upload" class="inline w-4 h-4 mr-1"></i> New
+                </button>
+
+                <div class="w-px bg-gray-300 mx-1 h-6 hidden sm:block"></div>
+
                 <button id="btn-reset" class="flex-1 sm:flex-none px-4 py-2 border-2 border-black uppercase text-xs font-bold hover:bg-black hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled>
                     Reset
                 </button>
@@ -494,6 +500,7 @@
         const btnRecord = document.getElementById('btn-record');
         const btnStop = document.getElementById('btn-stop'); // NEW STOP BUTTON
         const btnReset = document.getElementById('btn-reset');
+        const btnNewImage = document.getElementById('btn-new-image'); // NEW BUTTON
         const btnUseInput = document.getElementById('btn-use-input');
         const btnDownload = document.getElementById('btn-download');
         const btnFullscreen = document.getElementById('btn-fullscreen');
@@ -997,6 +1004,9 @@
         dropZone.addEventListener('drop', handleDrop);
         fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
         
+        // NEW: Load new image button listener
+        btnNewImage.addEventListener('click', () => fileInput.click());
+
         btnZoomToggle.addEventListener('click', toggleZoomMode);
         canvasWrapper.addEventListener('click', (e) => {
             if (viewMode === '1to1' && wasPanning) { wasPanning = false; return; }
@@ -1141,6 +1151,8 @@
             statTime.textContent = "--"; statFrames.textContent = "--"; statRender.textContent = "--"; statFps.textContent = "--";
             
             if (width && height && originalImage) {
+                // FIX: Clear canvas before redrawing to prevent ghosting with transparent PNGs
+                ctx.clearRect(0, 0, width, height);
                 ctx.drawImage(originalImage, 0, 0, width, height);
                 pixelData = ctx.getImageData(0, 0, width, height).data;
             }
