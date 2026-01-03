@@ -1,12 +1,12 @@
 # Pixel Sorter v2.5 (Web)
 
-A minimalist, high-performance "Falling Sand" pixel sorter built with modern web technologies. This tool simulates gravity-based pixel transposition to create smooth gradients and aesthetic glitch art, featuring high-fidelity video export and smart color-space sorting.
+minimalist pixel sorter inspired by powdertoy and applications of pixel sorting for glitch art
 
 ## Key Features
 
-* **Smart Color Sorting**: Uses a specialized (Value + Hue Bias) weight formula to prevent "sediment layers" and create clean color transitions.
-
 * **High-Fidelity Recording**: Generates "Pure" WebM files at up to 80Mbps bitrate to eliminate compression artifacts.
+
+* **Smart Color Sorting**: Uses a specialized (Value + Hue Bias) weight formula to prevent thick sediment layers and create clean color transitions.
 
 * **Intelligent Resolution Handling**: Supports up to 4K images with a smart workspace detector that suggests optimal scaling for real-time performance.
 
