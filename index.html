@@ -20,9 +20,9 @@
         .cursor-grabbing { cursor: grabbing; }
         .cursor-crosshair { cursor: crosshair; }
         
-        /* Canvas Transitions for smooth zoom toggle */
+        /* Canvas Transitions for smooth zoom toggle & opacity fade */
         #canvas, #mask-canvas {
-            transition: transform 0.1s linear; /* Fast interaction */
+            transition: transform 0.1s linear, opacity 0.3s ease; 
         }
         
         /* Fit Mode */
@@ -77,7 +77,12 @@
     <header class="border-b-2 border-black z-30 bg-white flex flex-col shrink-0">
         <!-- Main Title Row -->
         <div class="flex justify-between items-center px-4 sm:px-6 py-3 sm:py-4">
-            <h1 class="text-lg sm:text-xl font-bold tracking-tighter uppercase truncate">Real Time Pixel Sorter <span class="hidden sm:inline text-xs font-normal opacity-50 ml-2">v3.7 Artist Mode</span></h1>
+            <div class="flex items-center gap-3 overflow-hidden">
+                <h1 class="text-lg sm:text-xl font-bold tracking-tighter uppercase truncate">Real Time Pixel Sorter <span class="hidden sm:inline text-xs font-normal opacity-50 ml-2">v3.8 Artist Mode</span></h1>
+                <a href="https://github.com/marcelwo4jedynki/pixel-sort" target="_blank" class="text-gray-400 hover:text-black transition-colors shrink-0" title="View Source on GitHub">
+                    <i data-lucide="github" class="w-5 h-5"></i>
+                </a>
+            </div>
             <div class="text-xs font-bold bg-black text-white px-2 py-1 uppercase tracking-wider transition-colors shrink-0" id="status-text">WAITING</div>
         </div>
         
@@ -424,6 +429,11 @@
                 <button id="btn-record" class="flex-1 sm:flex-none px-6 py-2 border-2 border-black bg-black text-white uppercase text-xs font-bold hover:bg-white hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled>
                     Record
                 </button>
+                
+                <!-- Stop Button -->
+                <button id="btn-stop" class="px-4 py-2 border-2 border-black uppercase text-xs font-bold hover:bg-red-600 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed hidden">
+                    Stop
+                </button>
 
                 <div class="w-px bg-gray-300 mx-1 h-6 hidden sm:block"></div>
 
@@ -477,6 +487,7 @@
         // Buttons & Stats
         const btnSort = document.getElementById('btn-sort');
         const btnRecord = document.getElementById('btn-record');
+        const btnStop = document.getElementById('btn-stop'); // NEW STOP BUTTON
         const btnReset = document.getElementById('btn-reset');
         const btnUseInput = document.getElementById('btn-use-input');
         const btnDownload = document.getElementById('btn-download');
@@ -926,6 +937,30 @@
 
         btnSort.addEventListener('click', () => startSortingProcess(false));
         btnRecord.addEventListener('click', () => startSortingProcess(true));
+        
+        // Stop Button Logic
+        btnStop.addEventListener('click', () => {
+             if (isSorting) {
+                 isSorting = false;
+                 // Stop logic is effectively handled by step() checking isSorting
+                 // But we should also re-enable UI immediately
+                 statusText.textContent = "STOPPED";
+                 statusText.classList.add('bg-red-600', 'text-white');
+                 setTimeout(() => { if (!isSorting) statusText.classList.remove('bg-red-600'); }, 1500);
+                 
+                 btnStop.disabled = true;
+                 btnStop.classList.add('hidden');
+                 
+                 btnReset.disabled = false;
+                 if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                     mediaRecorder.stop();
+                 }
+                 
+                 // Restore Mask Visibility if needed
+                 maskCanvas.style.opacity = '';
+             }
+        });
+        
         btnReset.addEventListener('click', () => { if (isSorting && currentRunIsRecording) confirmResetDialog.classList.remove('hidden'); else resetCanvasState(); });
         btnUseInput.addEventListener('click', () => setAsInput(false));
         btnConfirmReset.addEventListener('click', () => { confirmResetDialog.classList.add('hidden'); resetCanvasState(); });
@@ -1020,8 +1055,19 @@
             isSorting = false; currentRunIsRecording = false;
             if (videoURL) URL.revokeObjectURL(videoURL);
             downloadDialog.classList.add('hidden');
-            // Download button now stays enabled if image exists
-            btnSort.disabled = false; btnRecord.disabled = false; btnUseInput.disabled = false;
+            
+            // UI Reset
+            btnSort.disabled = false; 
+            btnRecord.disabled = false; 
+            btnUseInput.disabled = false;
+            
+            // Hide Stop Button
+            btnStop.disabled = true;
+            btnStop.classList.add('hidden');
+            
+            // Reset Mask Opacity
+            maskCanvas.style.opacity = '';
+            
             progressBar.style.width = '0%'; progressBar.classList.remove('bg-green-500'); statusText.textContent = "READY";
             statTime.textContent = "--"; statFrames.textContent = "--"; statRender.textContent = "--"; statFps.textContent = "--";
             
@@ -1113,7 +1159,10 @@
             isSorting = true;
             currentRunIsRecording = isRecordingMode;
             btnSort.disabled = true; btnRecord.disabled = true; btnReset.disabled = false; btnUseInput.disabled = false; 
-            // btnDownload remains active to grab snapshots if needed, but video dl happens at end
+            
+            // Enable Stop Button
+            btnStop.disabled = false;
+            btnStop.classList.remove('hidden');
             
             const mode = sortModeInput.value;
             const gravity = gravityInput.value;
@@ -1126,6 +1175,20 @@
                 for(let i=0; i<maskData.length; i++) {
                     if (maskData[i] === 1) { hasActiveMask = true; break; }
                 }
+                
+                // Mask Animation: Fade out green shade
+                if (hasActiveMask) {
+                    maskCanvas.style.opacity = '0';
+                    // Wait for fade (300ms) + dwell (200ms) = 500ms
+                    await new Promise(r => setTimeout(r, 500));
+                }
+            }
+            
+            // Check if user pressed STOP during delay
+            if (!isSorting) {
+                // Restore if stopped
+                maskCanvas.style.opacity = '';
+                return;
             }
 
             stats = { startTime: Date.now(), endTime: 0, totalFrames: 0, totalRenderTime: 0 };
@@ -1225,6 +1288,13 @@
             statusText.textContent = "SORTING COMPLETE"; 
             progressBar.style.width = '100%'; 
             btnReset.disabled = false;
+            
+            // Revert UI state for Stop Button
+            btnStop.disabled = true;
+            btnStop.classList.add('hidden');
+            
+            // Revert Mask visibility so user can see what they selected again if they want
+            maskCanvas.style.opacity = '';
         }
         function finishRecording() {
             isSorting = false; statusText.textContent = "FINALIZING VIDEO..."; mediaRecorder.stop();
@@ -1234,6 +1304,11 @@
                 btnReset.disabled = false; 
                 progressBar.style.width = '100%'; 
                 progressBar.classList.add('bg-green-500');
+                
+                // Hide Stop Button
+                btnStop.disabled = true;
+                btnStop.classList.add('hidden');
+                maskCanvas.style.opacity = '';
                 
                 // Show "In Your Face" Download Dialog
                 downloadDialog.classList.remove('hidden');
