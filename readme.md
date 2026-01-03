@@ -4,6 +4,9 @@ minimalist pixel sorter inspired by powdertoy and use of pixel sorting in glitch
 
 each color gets assigned a weight, then they get sorted by gravity
 
+use it [here](https://marcelwo4jedynki.github.io/pixel-sort/)
+
+
 ## Key Features
 
 * **Alternating Gravity**: Physics toggle between vertical and horizontal passes every frame to ensure complex 2D gradients.
