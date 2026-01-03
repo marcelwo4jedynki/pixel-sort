@@ -14,16 +14,6 @@
         
         /* Hide cursor in fullscreen if needed */
         .fullscreen-canvas { cursor: none; }
-        
-        /* Stats Tooltip Styling */
-        .tooltip-trigger:hover .tooltip-content {
-            display: block;
-            animation: fadeIn 0.2s ease-out;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(5px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
 
         /* Panning Cursors */
         .cursor-grab { cursor: grab; }
@@ -50,28 +40,56 @@
             left: 0;
             /* Transform is handled via JS inline styles */
         }
+
+        /* Help Popover Animations */
+        .help-popover {
+            transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s;
+            opacity: 0;
+            visibility: hidden; /* Use visibility to fully hide interaction when transparent */
+            transform: translateY(10px);
+            /* Delay hiding to create "semi-solid" lingering feel */
+            transition-delay: 0.1s; 
+        }
+        .help-popover.active {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+            transition-delay: 0s; /* Instant appearance */
+        }
     </style>
 </head>
 <body class="bg-white text-black font-mono antialiased flex flex-col h-screen overflow-hidden selection:bg-black selection:text-white">
 
-    <!-- Header -->
-    <header class="flex justify-between items-center px-6 py-4 border-b-2 border-black z-30 bg-white">
-        <h1 class="text-xl font-bold tracking-tighter uppercase">Real Time Pixel Sorter <span class="text-xs font-normal opacity-50 ml-2">v3.0 Color Science</span></h1>
+    <!-- Header & Stats Dashboard -->
+    <header class="border-b-2 border-black z-30 bg-white flex flex-col shrink-0">
+        <!-- Main Title Row -->
+        <div class="flex justify-between items-center px-4 sm:px-6 py-3 sm:py-4">
+            <h1 class="text-lg sm:text-xl font-bold tracking-tighter uppercase truncate">Real Time Pixel Sorter <span class="hidden sm:inline text-xs font-normal opacity-50 ml-2">v3.3 Color Space</span></h1>
+            <div class="text-xs font-bold bg-black text-white px-2 py-1 uppercase tracking-wider transition-colors shrink-0" id="status-text">WAITING</div>
+        </div>
         
-        <!-- Status & Stats Tooltip Container -->
-        <div class="relative tooltip-trigger cursor-help py-2">
-            <div class="text-xs font-bold bg-black text-white px-2 py-1 uppercase tracking-wider transition-colors" id="status-text">WAITING FOR IMAGE</div>
-            
-            <!-- Tooltip Content -->
-            <div class="tooltip-content hidden absolute top-full right-0 mt-2 w-64 bg-white border-2 border-black shadow-xl p-4 z-50 text-left pointer-events-none">
-                <h3 class="text-xs font-bold uppercase border-b border-gray-200 pb-2 mb-2">Process Statistics</h3>
-                <div class="space-y-1 text-xs text-gray-600">
-                    <div class="flex justify-between"><span>Total Time:</span> <span id="stat-time" class="font-mono text-black">--</span></div>
-                    <div class="flex justify-between"><span>Total Frames:</span> <span id="stat-frames" class="font-mono text-black">--</span></div>
-                    <div class="flex justify-between"><span>Avg Render:</span> <span id="stat-render" class="font-mono text-black">--</span></div>
-                    <div class="flex justify-between"><span>Est. FPS:</span> <span id="stat-fps" class="font-mono text-black">--</span></div>
-                </div>
-            </div>
+        <!-- Stats Bar (Always Visible) -->
+        <div class="flex flex-wrap border-t border-gray-200 bg-gray-50 px-4 sm:px-6 py-2 gap-x-6 gap-y-1 text-xs font-mono uppercase tracking-tight overflow-x-auto whitespace-nowrap">
+             <div class="flex gap-2 items-center">
+                <i data-lucide="timer" class="w-3 h-3 text-gray-400"></i>
+                <span class="text-gray-400">Time:</span>
+                <span id="stat-time" class="font-bold">--</span>
+             </div>
+             <div class="flex gap-2 items-center">
+                <i data-lucide="layers" class="w-3 h-3 text-gray-400"></i>
+                <span class="text-gray-400">Frames:</span>
+                <span id="stat-frames" class="font-bold">--</span>
+             </div>
+             <div class="flex gap-2 items-center">
+                <i data-lucide="cpu" class="w-3 h-3 text-gray-400"></i>
+                <span class="text-gray-400">Render:</span>
+                <span id="stat-render" class="font-bold">--</span>
+             </div>
+             <div class="flex gap-2 items-center">
+                <i data-lucide="activity" class="w-3 h-3 text-gray-400"></i>
+                <span class="text-gray-400">FPS:</span>
+                <span id="stat-fps" class="font-bold">--</span>
+             </div>
         </div>
     </header>
 
@@ -81,14 +99,14 @@
         <!-- Empty State / Drop Zone -->
         <div id="drop-zone" class="absolute inset-4 border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 hover:border-black hover:text-black transition-colors cursor-pointer z-10">
             <i data-lucide="upload" class="w-12 h-12 mb-4"></i>
-            <p class="uppercase text-sm tracking-widest">Drop Image or Click to Upload</p>
+            <p class="uppercase text-sm tracking-widest text-center px-4">Drop Image or Tap to Upload</p>
             <input type="file" id="file-input" class="hidden" accept="image/*">
         </div>
 
         <!-- Resize Dialog (Hidden by default) -->
         <div id="resize-dialog" class="absolute inset-0 bg-white/90 z-20 hidden flex flex-col items-center justify-center p-8 text-center backdrop-blur-sm transition-opacity">
-            <div class="max-w-lg w-full border-2 border-black bg-white p-8 shadow-2xl">
-                <h2 class="text-2xl font-bold mb-4 uppercase tracking-tighter">Large Image Detected</h2>
+            <div class="max-w-lg w-full border-2 border-black bg-white p-6 sm:p-8 shadow-2xl">
+                <h2 class="text-xl sm:text-2xl font-bold mb-4 uppercase tracking-tighter">Large Image Detected</h2>
                 <div class="grid grid-cols-2 gap-4 text-sm mb-6 border-y border-gray-200 py-4">
                     <div class="text-right pr-4 border-r border-gray-200">
                         <div class="text-gray-400 text-xs uppercase">Original</div>
@@ -100,7 +118,7 @@
                     </div>
                 </div>
                 <p class="mb-8 text-gray-600 text-sm">
-                    This image is larger than your workspace. Scaling it down will significantly improve sorting speed and frame rate.
+                    This image is larger than your workspace. Scaling it down will significantly improve sorting speed.
                 </p>
                 <div class="flex flex-col sm:flex-row gap-4 justify-center">
                     <button id="btn-resize-fit" class="px-6 py-3 bg-black text-white font-bold uppercase hover:bg-gray-800 transition-colors flex-1">
@@ -135,88 +153,180 @@
         </div>
 
         <!-- Canvas Container -->
-        <!-- Added overflow-hidden to act as the viewport for panning -->
         <div class="relative shadow-2xl border-4 border-black hidden flex flex-col justify-center items-center overflow-hidden bg-gray-100 cursor-grab" 
              style="width: 100%; height: 100%;" 
              id="canvas-wrapper">
             
-            <!-- Canvas -->
-            <!-- Classes toggled via JS for Fit vs 1:1 -->
             <canvas id="canvas" class="canvas-fit" title="Click to load a new image (or Drag to Pan in 1:1)"></canvas>
-            
-            <!-- Progress Overlay -->
             <div id="progress-bar-container" class="absolute bottom-0 left-0 h-1 bg-black w-0 transition-all duration-300 z-10"></div>
         </div>
 
     </main>
 
     <!-- Controls Footer -->
-    <footer class="border-t-2 border-black bg-white p-4 z-30">
-        <div class="flex flex-wrap gap-4 items-center justify-center md:justify-between max-w-7xl mx-auto">
+    <footer class="border-t-2 border-black bg-white p-4 z-30 shrink-0 relative">
+        <div class="flex flex-col gap-4 max-w-7xl mx-auto">
             
-            <!-- Left: Info & View Mode -->
-            <div class="flex gap-4 items-center text-sm text-gray-500">
-                <span id="resolution-display">0 x 0</span>
-                <div class="h-4 w-px bg-gray-300"></div>
+            <!-- Top Row: Config -->
+            <div class="flex flex-wrap gap-4 items-center justify-center md:justify-start text-sm text-gray-500 pb-2 border-b border-gray-100 relative">
+                <span id="resolution-display" class="font-mono text-xs hidden sm:inline">0 x 0</span>
+                <div class="h-4 w-px bg-gray-300 hidden sm:block"></div>
+                
                 <button id="btn-zoom-toggle" class="flex items-center gap-2 hover:text-black transition-colors" title="Toggle 1:1 View">
                     <i data-lucide="zoom-in" class="w-4 h-4"></i>
-                    <span id="zoom-label" class="text-xs uppercase font-bold">Fit Screen</span>
+                    <span id="zoom-label" class="text-xs uppercase font-bold">Fit</span>
                 </button>
-                <div class="h-4 w-px bg-gray-300"></div>
                 
-                <div class="flex gap-2">
-                     <select id="color-mode" class="bg-transparent font-bold uppercase text-xs cursor-pointer outline-none hover:text-black transition-colors" title="Color Space / Sorting Algorithm">
-                        <option value="smart">Smart (HSV+)</option>
-                        <option value="cielab">CIELAB (L*)</option>
-                        <option value="luma">Luminance</option>
-                        <option value="classic">Classic (8-bit)</option>
-                        <option value="sat">Saturation</option>
-                        <option value="red">Red</option>
-                        <option value="green">Green</option>
-                        <option value="blue">Blue</option>
-                    </select>
-                </div>
+                <div class="h-4 w-px bg-gray-300 hidden sm:block"></div>
                 
-                <div class="h-4 w-px bg-gray-300"></div>
-                
-                <div class="flex gap-2">
-                    <select id="sort-mode" class="bg-transparent font-bold uppercase text-xs cursor-pointer outline-none hover:text-black transition-colors" title="Axis Mode">
-                        <option value="xy">XY (Mix)</option>
-                        <option value="y">Y Only</option>
-                        <option value="x">X Only</option>
-                    </select>
-                    <!-- Dynamic Direction Select -->
-                    <select id="gravity-direction" class="bg-transparent font-bold uppercase text-xs cursor-pointer outline-none hover:text-black transition-colors" title="Gravity Direction">
-                        <!-- Populated via JS -->
-                    </select>
+                <!-- Controls Group with Titles & Help -->
+                <div class="flex flex-wrap gap-4 justify-center items-end">
+                    
+                    <!-- Color Space Select -->
+                    <div class="flex flex-col gap-1 relative group">
+                        <div class="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase cursor-help select-none help-trigger" data-target="help-colorspace">
+                            Color Space <i data-lucide="help-circle" class="w-3 h-3"></i>
+                        </div>
+                        <select id="color-mode" class="bg-gray-50 border border-gray-200 rounded px-1 py-1 font-bold uppercase text-xs cursor-pointer outline-none hover:border-black transition-colors min-w-[100px]">
+                            <option value="smart">Smart (HSV+)</option>
+                            <option value="cielab">CIELAB (L*)</option>
+                            <option value="luma">Luma (709)</option>
+                            <option value="classic">Classic (8b)</option>
+                            <option value="sat">Saturation</option>
+                            <option value="red">Red Ch.</option>
+                            <option value="green">Green Ch.</option>
+                            <option value="blue">Blue Ch.</option>
+                        </select>
+                        <!-- Popover -->
+                        <div id="help-colorspace" class="help-popover absolute bottom-full left-0 mb-2 w-80 bg-white border-2 border-black shadow-xl p-4 z-50 text-xs text-left max-h-[80vh] overflow-y-auto">
+                            <h4 class="font-bold uppercase border-b border-gray-200 pb-1 mb-2">About Color Spaces</h4>
+                            <p class="text-gray-600 mb-3 leading-relaxed">
+                                A color space determines how pixels are weighted. We calculate a numerical value for every color and then sort them. The previews below show 4,096 uniformly distributed colors sorted by each algorithm, revealing the gradient curve created by that math.
+                            </p>
+                            
+                            <div class="space-y-4">
+                                <!-- Smart -->
+                                <div class="flex gap-3 items-start">
+                                    <canvas data-mode="smart" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
+                                    <div>
+                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">Smart (HSV+)</strong>
+                                        <span class="text-gray-500 leading-tight block">Sorts by Brightness, but uses Hue to break ties. Creates complex, glitchy gradients.</span>
+                                    </div>
+                                </div>
+                                <!-- CIELAB -->
+                                <div class="flex gap-3 items-start">
+                                    <canvas data-mode="cielab" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
+                                    <div>
+                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">CIELAB (L*)</strong>
+                                        <span class="text-gray-500 leading-tight block">Perceptually accurate lightness (how the human eye sees brightness). Very smooth.</span>
+                                    </div>
+                                </div>
+                                <!-- Luma -->
+                                <div class="flex gap-3 items-start">
+                                    <canvas data-mode="luma" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
+                                    <div>
+                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">Luma (Rec. 709)</strong>
+                                        <span class="text-gray-500 leading-tight block">Standard video grayscale brightness. Accurate but technical.</span>
+                                    </div>
+                                </div>
+                                <!-- Classic -->
+                                <div class="flex gap-3 items-start">
+                                    <canvas data-mode="classic" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
+                                    <div>
+                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">Classic (8-bit)</strong>
+                                        <span class="text-gray-500 leading-tight block">Rounds values to step intervals. Creates sediment-like layers and banding.</span>
+                                    </div>
+                                </div>
+                                <!-- Saturation -->
+                                <div class="flex gap-3 items-start">
+                                    <canvas data-mode="sat" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
+                                    <div>
+                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">Saturation</strong>
+                                        <span class="text-gray-500 leading-tight block">Sorts from grayscale (low) to vivid neon colors (high).</span>
+                                    </div>
+                                </div>
+                                <!-- Red -->
+                                <div class="flex gap-3 items-start">
+                                    <canvas data-mode="red" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
+                                    <div>
+                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">Red Channel</strong>
+                                        <span class="text-gray-500 leading-tight block">Sorts based purely on how much Red is in the pixel.</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Axis Select -->
+                    <div class="flex flex-col gap-1 relative group">
+                        <div class="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase cursor-help select-none help-trigger" data-target="help-axis">
+                            Axis <i data-lucide="help-circle" class="w-3 h-3"></i>
+                        </div>
+                        <select id="sort-mode" class="bg-gray-50 border border-gray-200 rounded px-1 py-1 font-bold uppercase text-xs cursor-pointer outline-none hover:border-black transition-colors min-w-[80px]">
+                            <option value="xy">XY Mix</option>
+                            <option value="y">Y Only</option>
+                            <option value="x">X Only</option>
+                        </select>
+                        <!-- Popover -->
+                        <div id="help-axis" class="help-popover absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-white border-2 border-black shadow-xl p-3 z-50 text-xs text-left hidden">
+                            <h4 class="font-bold uppercase border-b border-gray-200 pb-1 mb-2">Sorting Axis</h4>
+                            <ul class="space-y-1 text-gray-600 list-disc pl-4">
+                                <li><strong>XY Mix:</strong> Alternates Horizontal/Vertical every frame for fluid 2D movement.</li>
+                                <li><strong>Y Only:</strong> Sorts columns (Up/Down).</li>
+                                <li><strong>X Only:</strong> Sorts rows (Left/Right).</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <!-- Gravity Select -->
+                    <div class="flex flex-col gap-1 relative group">
+                        <div class="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase cursor-help select-none help-trigger" data-target="help-gravity">
+                            Gravity <i data-lucide="help-circle" class="w-3 h-3"></i>
+                        </div>
+                        <select id="gravity-direction" class="bg-gray-50 border border-gray-200 rounded px-1 py-1 font-bold uppercase text-xs cursor-pointer outline-none hover:border-black transition-colors min-w-[80px]">
+                            <!-- Populated via JS -->
+                        </select>
+                        <!-- Popover -->
+                        <div id="help-gravity" class="help-popover absolute bottom-full right-0 mb-2 w-48 bg-white border-2 border-black shadow-xl p-3 z-50 text-xs text-left hidden">
+                            <h4 class="font-bold uppercase border-b border-gray-200 pb-1 mb-2">Gravity Direction</h4>
+                            <p class="text-gray-600 mb-2">Determines where "heavy" (bright/high-value) pixels fall.</p>
+                            <ul class="space-y-1 text-gray-600 list-disc pl-4">
+                                <li><strong>XY:</strong> Pulls pixels towards a corner.</li>
+                                <li><strong>X/Y:</strong> Pulls pixels to the edge.</li>
+                            </ul>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Center: Actions -->
-            <div class="flex gap-3">
-                <button id="btn-reset" class="px-6 py-2 border-2 border-black uppercase text-sm font-bold hover:bg-black hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled>
+            <!-- Bottom Row: Buttons -->
+            <div class="flex flex-wrap gap-3 justify-center items-center">
+                <button id="btn-reset" class="px-4 py-2 border-2 border-black uppercase text-xs font-bold hover:bg-black hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled>
                     Reset
                 </button>
-                <button id="btn-use-input" class="px-6 py-2 border-2 border-black uppercase text-sm font-bold hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" title="Use current result as input for new sorts" disabled>
-                    Use as Input
+                <button id="btn-use-input" class="px-4 py-2 border-2 border-black uppercase text-xs font-bold hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" title="Use result as input" disabled>
+                    Use Input
                 </button>
-                <div class="w-px bg-gray-300 mx-2"></div>
-                <button id="btn-sort" class="px-6 py-2 border-2 border-black uppercase text-sm font-bold hover:bg-black hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled>
-                    Start Sort
+                
+                <div class="w-px bg-gray-300 mx-1 h-6 hidden sm:block"></div>
+                
+                <button id="btn-sort" class="flex-1 sm:flex-none px-6 py-2 border-2 border-black uppercase text-xs font-bold hover:bg-black hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled>
+                    Start
                 </button>
-                <button id="btn-record" class="px-6 py-2 border-2 border-black bg-black text-white uppercase text-sm font-bold hover:bg-white hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled>
-                    Record Sort
+                <button id="btn-record" class="flex-1 sm:flex-none px-6 py-2 border-2 border-black bg-black text-white uppercase text-xs font-bold hover:bg-white hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled>
+                    Record
                 </button>
-            </div>
 
-            <!-- Right: Tools -->
-            <div class="flex gap-3">
-                <button id="btn-fullscreen" class="p-2 border-2 border-black hover:bg-black hover:text-white transition-colors" title="Maximize Preview">
-                    <i data-lucide="maximize" class="w-5 h-5"></i>
-                </button>
-                <button id="btn-download" class="p-2 border-2 border-black hover:bg-black hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled title="Download WebM">
-                    <i data-lucide="download" class="w-5 h-5"></i>
-                </button>
+                <div class="w-px bg-gray-300 mx-1 h-6 hidden sm:block"></div>
+
+                <div class="flex gap-2">
+                    <button id="btn-fullscreen" class="p-2 border-2 border-black hover:bg-black hover:text-white transition-colors" title="Maximize">
+                        <i data-lucide="maximize" class="w-4 h-4"></i>
+                    </button>
+                    <button id="btn-download" class="p-2 border-2 border-black hover:bg-black hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled title="Download">
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                    </button>
+                </div>
             </div>
         </div>
     </footer>
@@ -301,6 +411,137 @@
         let stream = null;
         let videoURL = null;
 
+        // --- Help System Logic ---
+        const helpTriggers = document.querySelectorAll('.help-trigger');
+        let activePopover = null;
+
+        helpTriggers.forEach(trigger => {
+            // Desktop Hover
+            trigger.addEventListener('mouseenter', (e) => {
+                if (window.matchMedia("(hover: hover)").matches) {
+                    showPopover(trigger.dataset.target);
+                }
+            });
+            trigger.addEventListener('mouseleave', (e) => {
+                if (window.matchMedia("(hover: hover)").matches) {
+                    hidePopover(trigger.dataset.target);
+                }
+            });
+            
+            // Mobile/Touch Click
+            trigger.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent immediate close
+                const targetId = trigger.dataset.target;
+                const popover = document.getElementById(targetId);
+                
+                // Toggle if same, open if different
+                if (activePopover && activePopover !== popover) {
+                    activePopover.classList.remove('active');
+                    // Removed immediate 'hidden' add to allow transition
+                    setTimeout(() => activePopover?.classList.add('hidden'), 300);
+                }
+                
+                if (popover.classList.contains('active')) {
+                    hidePopover(targetId);
+                    activePopover = null;
+                } else {
+                    showPopover(targetId);
+                    activePopover = popover;
+                }
+            });
+        });
+
+        // Touch elsewhere to kill
+        document.addEventListener('click', (e) => {
+            if (activePopover && !activePopover.contains(e.target)) {
+                hidePopover(activePopover.id);
+                activePopover = null;
+            }
+        });
+
+        function showPopover(id) {
+            const popover = document.getElementById(id);
+            popover.classList.remove('hidden');
+            // Small delay to allow transition to render
+            requestAnimationFrame(() => {
+                popover.classList.add('active');
+            });
+        }
+
+        function hidePopover(id) {
+            const popover = document.getElementById(id);
+            popover.classList.remove('active');
+            // Wait for transition to finish before hiding
+            setTimeout(() => {
+                if (!popover.classList.contains('active')) {
+                    popover.classList.add('hidden');
+                }
+            }, 300);
+        }
+
+        // --- PREVIEW GENERATION SYSTEM ---
+        
+        window.addEventListener('load', generatePreviews);
+
+        function generatePreviews() {
+            const previews = document.querySelectorAll('.preview-canvas');
+            const pW = 64;
+            const pH = 64;
+            const totalPixels = pW * pH; // 4096
+            
+            // 1. Generate Uniformly Distributed Color Cube
+            // We need 4096 colors. 16 * 16 * 16 = 4096.
+            // Iterate R, G, B in steps of 17 (255/15)
+            const uniformData = new Uint8ClampedArray(totalPixels * 4);
+            let idx = 0;
+            for(let r=0; r<16; r++) {
+                for(let g=0; g<16; g++) {
+                    for(let b=0; b<16; b++) {
+                        uniformData[idx*4] = r * 17;
+                        uniformData[idx*4+1] = g * 17;
+                        uniformData[idx*4+2] = b * 17;
+                        uniformData[idx*4+3] = 255;
+                        idx++;
+                    }
+                }
+            }
+
+            previews.forEach(pCanvas => {
+                pCanvas.width = pW;
+                pCanvas.height = pH;
+                const pCtx = pCanvas.getContext('2d');
+                const mode = pCanvas.dataset.mode;
+                
+                // Clone data
+                const localPixelData = new Uint8ClampedArray(uniformData);
+                
+                // Calculate Weights for this specific mode
+                const weights = calculateWeights(localPixelData, pW, pH, mode);
+                
+                // --- GLOBAL SORT ---
+                // Create an index array
+                const indices = new Uint32Array(totalPixels);
+                for(let i=0; i<totalPixels; i++) indices[i] = i;
+                
+                // Sort indices based on weights
+                indices.sort((a, b) => weights[a] - weights[b]);
+                
+                // Reconstruct sorted pixel data
+                const sortedPixelData = new Uint8ClampedArray(totalPixels * 4);
+                for(let i=0; i<totalPixels; i++) {
+                    const originalIdx = indices[i];
+                    sortedPixelData[i*4] = localPixelData[originalIdx*4];
+                    sortedPixelData[i*4+1] = localPixelData[originalIdx*4+1];
+                    sortedPixelData[i*4+2] = localPixelData[originalIdx*4+2];
+                    sortedPixelData[i*4+3] = 255;
+                }
+                
+                const imageData = new ImageData(sortedPixelData, pW, pH);
+                pCtx.putImageData(imageData, 0, 0);
+            });
+        }
+
+
         // --- Gravity Options Logic ---
         function updateGravityOptions() {
             const mode = sortModeInput.value;
@@ -310,10 +551,10 @@
             
             if (mode === 'xy') {
                 options = [
-                    { val: 'dr', text: '↘ Down-Right' },
-                    { val: 'dl', text: '↙ Down-Left' },
-                    { val: 'ur', text: '↗ Up-Right' },
-                    { val: 'ul', text: '↖ Up-Left' }
+                    { val: 'dr', text: '↘ Dn-Rt' },
+                    { val: 'dl', text: '↙ Dn-Lt' },
+                    { val: 'ur', text: '↗ Up-Rt' },
+                    { val: 'ul', text: '↖ Up-Lt' }
                 ];
             } else if (mode === 'y') {
                 options = [
@@ -540,7 +781,7 @@
             } else {
                 // Switch to Fit
                 viewMode = 'fit';
-                zoomLabel.textContent = "Fit Screen";
+                zoomLabel.textContent = "Fit";
                 canvas.classList.add('canvas-fit');
                 canvas.classList.remove('canvas-1to1');
                 canvasWrapper.classList.remove('cursor-grab', 'cursor-grabbing');
@@ -638,7 +879,7 @@
             
             // Ensure we start in fit mode
             viewMode = 'fit';
-            zoomLabel.textContent = "Fit Screen";
+            zoomLabel.textContent = "Fit";
             canvas.classList.add('canvas-fit');
             canvas.classList.remove('canvas-1to1');
             canvasWrapper.classList.add('justify-center', 'items-center');
@@ -647,10 +888,10 @@
         }
 
         // --- Physics Engine (Calculates weights based on Mode) ---
-
-        function calculateWeights(data, w, h) {
+        // Updated to accept mode override for help previews
+        function calculateWeights(data, w, h, modeOverride = null) {
             const weights = new Float32Array(w * h);
-            const mode = colorModeInput.value;
+            const mode = modeOverride || colorModeInput.value;
             
             for (let i = 0; i < w * h; i++) {
                 const idx = i * 4;
