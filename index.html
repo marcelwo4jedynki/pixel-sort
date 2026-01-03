@@ -33,6 +33,16 @@
                Flexbox in the parent will handle centering and aspect ratio
                by shrinking the element itself. */
         }
+
+        /* FIX: Center the mask canvas when in fit mode. 
+           The main canvas is centered by the parent's flexbox.
+           Since the mask is absolute, we must manually center it to match.
+        */
+        #mask-canvas.canvas-fit {
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
         
         /* 1:1 Mode */
         .canvas-1to1 {
@@ -174,8 +184,8 @@
                         <i data-lucide="film" class="w-5 h-5"></i> Download Video
                     </button>
                     
-                    <button id="btn-dl-image-main" class="w-full py-3 border-2 border-black text-black font-bold uppercase hover:bg-gray-100 transition-colors flex items-center justify-center gap-3">
-                        <i data-lucide="image" class="w-5 h-5"></i> Download Current Frame
+                    <button id="btn-dl-image-main" class="w-full py-3 border-2 border-black text-black font-bold uppercase hover:bg-gray-100 transition-colors flex items-center justify-center gap-2">
+                        <i data-lucide="image" class="w-8 h-8"></i> Download Current Frame
                     </button>
                 </div>
                 
