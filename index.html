@@ -127,7 +127,7 @@
         </div>
 
         <!-- Resize Dialog (Hidden by default) -->
-        <div id="resize-dialog" class="absolute inset-0 bg-white/90 z-20 hidden flex flex-col items-center justify-center p-8 text-center backdrop-blur-sm transition-opacity">
+        <div id="resize-dialog" class="absolute inset-0 bg-white/90 z-20 hidden flex flex-col items-center justify-center p-4 sm:p-8 text-center backdrop-blur-sm transition-opacity">
             <div class="max-w-lg w-full border-2 border-black bg-white p-6 sm:p-8 shadow-2xl">
                 <h2 class="text-xl sm:text-2xl font-bold mb-4 uppercase tracking-tighter">Large Image Detected</h2>
                 <div class="grid grid-cols-2 gap-4 text-sm mb-6 border-y border-gray-200 py-4">
@@ -155,7 +155,7 @@
         </div>
 
         <!-- Reset Confirmation Dialog -->
-        <div id="confirm-reset-dialog" class="absolute inset-0 bg-white/90 z-30 hidden flex flex-col items-center justify-center p-8 text-center backdrop-blur-sm">
+        <div id="confirm-reset-dialog" class="absolute inset-0 bg-white/90 z-30 hidden flex flex-col items-center justify-center p-4 sm:p-8 text-center backdrop-blur-sm">
             <div class="max-w-md w-full border-2 border-black bg-white p-8 shadow-2xl">
                 <div class="flex justify-center mb-4 text-red-600">
                     <i data-lucide="alert-triangle" class="w-12 h-12"></i>
@@ -176,7 +176,7 @@
         </div>
 
         <!-- Render Complete / Download Dialog -->
-        <div id="download-dialog" class="absolute inset-0 bg-white/95 z-40 hidden flex flex-col items-center justify-center p-8 text-center backdrop-blur-md animate-in fade-in zoom-in-95 duration-200">
+        <div id="download-dialog" class="absolute inset-0 bg-white/95 z-40 hidden flex flex-col items-center justify-center p-4 sm:p-8 text-center backdrop-blur-md animate-in fade-in zoom-in-95 duration-200">
             <div class="max-w-lg w-full border-4 border-black bg-white p-8 shadow-2xl relative">
                 <button id="btn-close-dl" class="absolute top-4 right-4 text-gray-400 hover:text-black transition-colors">
                     <i data-lucide="x" class="w-6 h-6"></i>
@@ -221,11 +221,11 @@
     </main>
 
     <!-- Controls Footer -->
-    <footer class="border-t-2 border-black bg-white p-4 z-30 shrink-0 relative">
+    <footer class="border-t-2 border-black bg-white p-2 sm:p-4 z-30 shrink-0 relative">
         <div class="flex flex-col gap-4 max-w-7xl mx-auto">
             
             <!-- Top Row: Config -->
-            <div class="flex flex-wrap gap-4 items-center justify-center text-sm text-gray-500 pb-2 border-b border-gray-100 relative">
+            <div class="flex flex-wrap gap-2 sm:gap-4 items-center justify-center text-sm text-gray-500 pb-2 border-b border-gray-100 relative">
                 
                 <span id="resolution-display" class="font-mono text-xs hidden sm:inline">0 x 0</span>
                 <div class="h-4 w-px bg-gray-300 hidden sm:block"></div>
@@ -368,8 +368,8 @@
             </div>
 
             <!-- Artist Mode Toolbar (Hidden by default) -->
-            <div id="artist-toolbar" class="hidden flex-wrap gap-4 items-center justify-center bg-gray-50 p-2 border border-gray-200 rounded-lg animate-in fade-in slide-in-from-top-2 duration-200">
-                <div class="flex items-center gap-2 border-r border-gray-300 pr-4 mr-2">
+            <div id="artist-toolbar" class="hidden flex-wrap gap-2 sm:gap-4 items-center justify-center bg-gray-50 p-1 sm:p-2 border border-gray-200 rounded-lg animate-in fade-in slide-in-from-top-2 duration-200">
+                <div class="flex items-center gap-2 border-r-0 sm:border-r border-gray-300 pr-0 sm:pr-4 mr-0 sm:mr-2">
                     <span class="text-[10px] font-bold uppercase text-gray-400">Tools</span>
                     <!-- Tool: Brush -->
                     <button class="tool-btn p-2 border border-transparent rounded hover:bg-white hover:border-gray-300 active:bg-gray-200 transition-all active-tool" data-tool="brush" title="Circle Brush">
@@ -390,9 +390,9 @@
                 </div>
 
                 <!-- Brush Settings -->
-                <div class="flex items-center gap-3 border-r border-gray-300 pr-4 mr-2" id="brush-settings">
+                <div class="flex items-center gap-3 border-r-0 sm:border-r border-gray-300 pr-0 sm:pr-4 mr-0 sm:mr-2" id="brush-settings">
                     <span class="text-[10px] font-bold uppercase text-gray-400">Size</span>
-                    <input type="range" id="brush-size" min="5" max="200" value="50" class="w-24 h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer">
+                    <input type="range" id="brush-size" min="5" max="200" value="50" class="w-20 sm:w-24 h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer">
                 </div>
 
                 <!-- Mode Settings -->
@@ -405,7 +405,7 @@
                 </div>
                  
                  <!-- Mask Actions -->
-                 <div class="flex items-center ml-2 gap-2 border-l border-gray-300 pl-4">
+                 <div class="flex items-center ml-0 sm:ml-2 gap-2 border-l-0 sm:border-l border-gray-300 pl-0 sm:pl-4">
                      <!-- Undo -->
                      <button id="btn-undo-mask" class="p-1 hover:bg-white rounded hover:text-black text-gray-500 transition-colors" title="Undo Mask Change">
                         <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
@@ -418,11 +418,11 @@
             </div>
 
             <!-- Bottom Row: Buttons -->
-            <div class="flex flex-wrap gap-3 justify-center items-center">
-                <button id="btn-reset" class="px-4 py-2 border-2 border-black uppercase text-xs font-bold hover:bg-black hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled>
+            <div class="flex flex-wrap gap-2 sm:gap-3 justify-center items-center">
+                <button id="btn-reset" class="flex-1 sm:flex-none px-4 py-2 border-2 border-black uppercase text-xs font-bold hover:bg-black hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled>
                     Reset
                 </button>
-                <button id="btn-use-input" class="px-4 py-2 border-2 border-black uppercase text-xs font-bold hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" title="Use result as input" disabled>
+                <button id="btn-use-input" class="flex-1 sm:flex-none px-4 py-2 border-2 border-black uppercase text-xs font-bold hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" title="Use result as input" disabled>
                     Use as Input
                 </button>
                 
@@ -436,7 +436,7 @@
                 </button>
                 
                 <!-- Stop Button -->
-                <button id="btn-stop" class="px-4 py-2 border-2 border-black uppercase text-xs font-bold hover:bg-red-600 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed hidden">
+                <button id="btn-stop" class="flex-1 sm:flex-none px-4 py-2 border-2 border-black uppercase text-xs font-bold hover:bg-red-600 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed hidden">
                     Stop
                 </button>
 
