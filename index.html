@@ -56,7 +56,7 @@
 
     <!-- Header -->
     <header class="flex justify-between items-center px-6 py-4 border-b-2 border-black z-30 bg-white">
-        <h1 class="text-xl font-bold tracking-tighter uppercase">Pixel Sorter <span class="text-xs font-normal opacity-50 ml-2">v2.6 Pan & Zoom</span></h1>
+        <h1 class="text-xl font-bold tracking-tighter uppercase">Pixel Sorter <span class="text-xs font-normal opacity-50 ml-2">v2.7 Modes</span></h1>
         
         <!-- Status & Stats Tooltip Container -->
         <div class="relative tooltip-trigger cursor-help py-2">
@@ -162,6 +162,12 @@
                     <i data-lucide="zoom-in" class="w-4 h-4"></i>
                     <span id="zoom-label" class="text-xs uppercase font-bold">Fit Screen</span>
                 </button>
+                <div class="h-4 w-px bg-gray-300"></div>
+                <select id="sort-mode" class="bg-transparent font-bold uppercase text-xs cursor-pointer outline-none hover:text-black transition-colors" title="Sorting Direction">
+                    <option value="xy">XY (Mix)</option>
+                    <option value="y">Y Only</option>
+                    <option value="x">X Only</option>
+                </select>
             </div>
 
             <!-- Center: Actions -->
@@ -222,6 +228,7 @@
         const btnFullscreen = document.getElementById('btn-fullscreen');
         const btnZoomToggle = document.getElementById('btn-zoom-toggle');
         const zoomLabel = document.getElementById('zoom-label');
+        const sortModeInput = document.getElementById('sort-mode');
         
         const statusText = document.getElementById('status-text');
         const resDisplay = document.getElementById('resolution-display');
@@ -584,6 +591,9 @@
             btnReset.disabled = false; // Reset enabled for interrupt
             btnDownload.disabled = true;
             
+            // Get Current Sort Mode
+            const mode = sortModeInput.value;
+            
             // Reset stats
             stats = { startTime: Date.now(), endTime: 0, totalFrames: 0, totalRenderTime: 0 };
 
@@ -654,10 +664,22 @@
                 } 
                 else if (loopState === 'sorting') {
                     let changes = false;
-                    const isVertical = (frameCount % 2 === 0);
+                    
+                    // Determine which pass to run based on Mode
+                    let performVertical = false;
+                    let performHorizontal = false;
+                    
+                    if (mode === 'xy') {
+                        if (frameCount % 2 === 0) performVertical = true;
+                        else performHorizontal = true;
+                    } else if (mode === 'y') {
+                        performVertical = true;
+                    } else if (mode === 'x') {
+                        performHorizontal = true;
+                    }
 
                     // Physics Pass
-                    if (isVertical) {
+                    if (performVertical) {
                         // Vertical Pass
                         for (let y = 0; y < height - 1; y += 2) {
                             const rowOffset = y * width;
@@ -683,7 +705,9 @@
                                 }
                             }
                         }
-                    } else {
+                    } 
+                    
+                    if (performHorizontal) {
                         // Horizontal Pass
                         for (let y = 0; y < height; y++) {
                             const rowOffset = y * width;
@@ -728,6 +752,8 @@
                     } else {
                         frameCount++;
                         stats.totalFrames++;
+                        // For single axis modes, progress bar might be inaccurate since maxFrames estimates XY travel
+                        // But it's just an estimate, so it's fine.
                         const pct = Math.min(100, (frameCount / maxFrames) * 100);
                         progressBar.style.width = `${pct}%`;
                         statusText.textContent = `SORTING... FRAME ${frameCount}`;
