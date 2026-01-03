@@ -257,24 +257,60 @@
                             <option value="blue">Blue Ch.</option>
                         </select>
                         <!-- Popover -->
-                        <div id="help-colorspace" class="help-popover absolute bottom-full left-0 mb-2 w-80 bg-white border-2 border-black shadow-xl p-4 z-50 text-xs text-left max-h-[80vh] overflow-y-auto">
+                <div id="help-colorspace" class="help-popover absolute bottom-full left-0 mb-2 w-80 bg-white border-2 border-black shadow-xl p-4 z-50 text-xs text-left max-h-[80vh] overflow-y-auto">
                             <h4 class="font-bold uppercase border-b border-gray-200 pb-1 mb-2">About Color Spaces</h4>
                             <p class="text-gray-600 mb-3 leading-relaxed">
-                                A color space determines how pixels are weighted. We calculate a numerical value for every color and then sort them.
+                                A color space determines how pixels are weighted. We calculate a numerical value for every color and then sort them. The previews below show 4,096 uniformly distributed colors sorted by each algorithm, revealing the gradient curve created by that math.
                             </p>
                             
                             <div class="space-y-4">
+                                <!-- Smart -->
                                 <div class="flex gap-3 items-start">
                                     <canvas data-mode="smart" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
-                                    <div><strong class="block uppercase text-[10px]">Smart</strong><span class="text-gray-500">Brightness + Hue Bias.</span></div>
+                                    <div>
+                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">Smart (HSV+)</strong>
+                                        <span class="text-gray-500 leading-tight block">Sorts by Brightness, but uses Hue to break ties. Creates complex, glitchy gradients.</span>
+                                    </div>
                                 </div>
+                                <!-- CIELAB -->
                                 <div class="flex gap-3 items-start">
                                     <canvas data-mode="cielab" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
-                                    <div><strong class="block uppercase text-[10px]">CIELAB</strong><span class="text-gray-500">Human eye perception.</span></div>
+                                    <div>
+                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">CIELAB (L*)</strong>
+                                        <span class="text-gray-500 leading-tight block">Perceptually accurate lightness (how the human eye sees brightness). Very smooth.</span>
+                                    </div>
                                 </div>
+                                <!-- Luma -->
                                 <div class="flex gap-3 items-start">
                                     <canvas data-mode="luma" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
-                                    <div><strong class="block uppercase text-[10px]">Luma</strong><span class="text-gray-500">Video standard brightness.</span></div>
+                                    <div>
+                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">Luma (Rec. 709)</strong>
+                                        <span class="text-gray-500 leading-tight block">Standard video grayscale brightness. Accurate but technical.</span>
+                                    </div>
+                                </div>
+                                <!-- Classic -->
+                                <div class="flex gap-3 items-start">
+                                    <canvas data-mode="classic" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
+                                    <div>
+                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">Classic (8-bit)</strong>
+                                        <span class="text-gray-500 leading-tight block">Rounds values to step intervals. Creates sediment-like layers and banding.</span>
+                                    </div>
+                                </div>
+                                <!-- Saturation -->
+                                <div class="flex gap-3 items-start">
+                                    <canvas data-mode="sat" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
+                                    <div>
+                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">Saturation</strong>
+                                        <span class="text-gray-500 leading-tight block">Sorts from grayscale (low) to vivid neon colors (high).</span>
+                                    </div>
+                                </div>
+                                <!-- Red -->
+                                <div class="flex gap-3 items-start">
+                                    <canvas data-mode="red" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
+                                    <div>
+                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">Red Channel</strong>
+                                        <span class="text-gray-500 leading-tight block">Sorts based purely on how much Red is in the pixel.</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -362,7 +398,7 @@
                     Reset
                 </button>
                 <button id="btn-use-input" class="px-4 py-2 border-2 border-black uppercase text-xs font-bold hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" title="Use result as input" disabled>
-                    Use Input
+                    Use as Input
                 </button>
                 
                 <div class="w-px bg-gray-300 mx-1 h-6 hidden sm:block"></div>
@@ -878,7 +914,7 @@
                 originalImage = newImg;
                 resetCanvasState();
                 statusText.textContent = "IMAGE UPDATED"; statusText.classList.add('bg-blue-600', 'text-white');
-                setTimeout(() => { if (!isSorting) { statusText.textContent = "READY"; statusText.classList.remove('bg-blue-600', 'text-white'); } }, 1500);
+                setTimeout(() => { if (!isSorting) { statusText.textContent = "READY"; statusText.classList.remove('bg-blue-600'); } }, 1500);
             };
             newImg.src = dataURL;
         }
