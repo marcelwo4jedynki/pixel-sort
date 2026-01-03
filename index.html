@@ -17,14 +17,39 @@
         
         /* Indicate canvas is clickable for new upload */
         #canvas { cursor: pointer; }
+
+        /* Stats Tooltip Styling */
+        .tooltip-trigger:hover .tooltip-content {
+            display: block;
+            animation: fadeIn 0.2s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body class="bg-white text-black font-mono antialiased flex flex-col h-screen overflow-hidden selection:bg-black selection:text-white">
 
     <!-- Header -->
-    <header class="flex justify-between items-center px-6 py-4 border-b-2 border-black">
-        <h1 class="text-xl font-bold tracking-tighter uppercase">Pixel Sorter <span class="text-xs font-normal opacity-50 ml-2">v2.4 Smart-Res</span></h1>
-        <div class="text-xs" id="status-text">WAITING FOR IMAGE</div>
+    <header class="flex justify-between items-center px-6 py-4 border-b-2 border-black z-30 bg-white">
+        <h1 class="text-xl font-bold tracking-tighter uppercase">Pixel Sorter <span class="text-xs font-normal opacity-50 ml-2">v2.5 Stats</span></h1>
+        
+        <!-- Status & Stats Tooltip Container -->
+        <div class="relative tooltip-trigger cursor-help py-2">
+            <div class="text-xs font-bold bg-black text-white px-2 py-1 uppercase tracking-wider" id="status-text">WAITING FOR IMAGE</div>
+            
+            <!-- Tooltip Content -->
+            <div class="tooltip-content hidden absolute top-full right-0 mt-2 w-64 bg-white border-2 border-black shadow-xl p-4 z-50 text-left pointer-events-none">
+                <h3 class="text-xs font-bold uppercase border-b border-gray-200 pb-2 mb-2">Process Statistics</h3>
+                <div class="space-y-1 text-xs text-gray-600">
+                    <div class="flex justify-between"><span>Total Time:</span> <span id="stat-time" class="font-mono text-black">--</span></div>
+                    <div class="flex justify-between"><span>Total Frames:</span> <span id="stat-frames" class="font-mono text-black">--</span></div>
+                    <div class="flex justify-between"><span>Avg Render:</span> <span id="stat-render" class="font-mono text-black">--</span></div>
+                    <div class="flex justify-between"><span>Est. FPS:</span> <span id="stat-fps" class="font-mono text-black">--</span></div>
+                </div>
+            </div>
+        </div>
     </header>
 
     <!-- Main Workspace -->
@@ -65,10 +90,34 @@
             </div>
         </div>
 
+        <!-- Reset Confirmation Dialog -->
+        <div id="confirm-reset-dialog" class="absolute inset-0 bg-white/90 z-30 hidden flex flex-col items-center justify-center p-8 text-center backdrop-blur-sm">
+            <div class="max-w-md w-full border-2 border-black bg-white p-8 shadow-2xl">
+                <div class="flex justify-center mb-4 text-red-600">
+                    <i data-lucide="alert-triangle" class="w-12 h-12"></i>
+                </div>
+                <h2 class="text-xl font-bold mb-2 uppercase tracking-tighter">Interrupt Sorting?</h2>
+                <p class="mb-8 text-gray-600 text-sm">
+                    A sort is currently in progress. Resetting now will discard the current video recording.
+                </p>
+                <div class="flex gap-4 justify-center">
+                    <button id="btn-confirm-reset" class="px-6 py-2 bg-red-600 text-white font-bold uppercase hover:bg-red-700 transition-colors flex-1">
+                        Yes, Reset
+                    </button>
+                    <button id="btn-cancel-reset" class="px-6 py-2 border-2 border-black font-bold uppercase hover:bg-gray-100 transition-colors flex-1">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Canvas Container -->
-        <!-- Added max-w/max-h classes to ensure large images don't break layout visually -->
-        <div class="relative shadow-2xl border-4 border-black hidden max-w-full max-h-full flex flex-col" id="canvas-wrapper">
-            <canvas id="canvas" title="Click to load a new image" class="object-contain max-w-full max-h-full block"></canvas>
+        <!-- Added wrapper styles to enforce center fitting -->
+        <div class="relative shadow-2xl border-4 border-black hidden flex flex-col justify-center items-center" 
+             style="max-width: 100%; max-height: 100%;" 
+             id="canvas-wrapper">
+            <!-- Canvas Object Fit Logic: ensure it scales down visually inside the container -->
+            <canvas id="canvas" title="Click to load a new image" class="block w-auto h-auto" style="max-width: 100%; max-height: 100%; object-fit: contain;"></canvas>
             <!-- Progress Overlay -->
             <div id="progress-bar-container" class="absolute bottom-0 left-0 h-1 bg-black w-0 transition-all duration-300"></div>
         </div>
@@ -76,7 +125,7 @@
     </main>
 
     <!-- Controls Footer -->
-    <footer class="border-t-2 border-black bg-white p-4">
+    <footer class="border-t-2 border-black bg-white p-4 z-30">
         <div class="flex flex-wrap gap-4 items-center justify-center md:justify-between max-w-7xl mx-auto">
             
             <!-- Left: Info -->
@@ -129,7 +178,12 @@
         const btnResizeFit = document.getElementById('btn-resize-fit');
         const btnKeepOrig = document.getElementById('btn-keep-orig');
 
-        // Buttons
+        // Reset Confirmation Elements
+        const confirmResetDialog = document.getElementById('confirm-reset-dialog');
+        const btnConfirmReset = document.getElementById('btn-confirm-reset');
+        const btnCancelReset = document.getElementById('btn-cancel-reset');
+
+        // Buttons & Stats
         const btnSort = document.getElementById('btn-sort');
         const btnRecord = document.getElementById('btn-record');
         const btnReset = document.getElementById('btn-reset');
@@ -138,11 +192,25 @@
         const statusText = document.getElementById('status-text');
         const resDisplay = document.getElementById('resolution-display');
         const progressBar = document.getElementById('progress-bar-container');
+        
+        // Stat fields
+        const statTime = document.getElementById('stat-time');
+        const statFrames = document.getElementById('stat-frames');
+        const statRender = document.getElementById('stat-render');
+        const statFps = document.getElementById('stat-fps');
 
         // --- State ---
         let originalImage = null;
         let animationId = null;
         let isSorting = false;
+        
+        // Statistics State
+        let stats = {
+            startTime: 0,
+            endTime: 0,
+            totalFrames: 0,
+            totalRenderTime: 0
+        };
         
         // Data Buffers
         let pixelData = null; // Uint8ClampedArray (Visuals)
@@ -163,17 +231,31 @@
         dropZone.addEventListener('drop', handleDrop);
         fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
         
-        canvas.addEventListener('click', () => fileInput.click());
+        canvas.addEventListener('click', () => {
+            // Only allow click-to-upload if not currently sorting
+            if (!isSorting) fileInput.click();
+        });
 
         btnSort.addEventListener('click', () => startSortingProcess(false));
         btnRecord.addEventListener('click', () => startSortingProcess(true));
         
         btnReset.addEventListener('click', () => {
-            // Reset using current image and last choice (defaulting to fit if logic complex, but here just re-trigger file logic or simple reset)
-            // For simplicity, reset reloads the original image and resets state, preserving last resolution choice isn't cached,
-            // so let's just re-draw the current canvas state or re-init.
-            // Actually, best to just stop animation and reset UI.
-            resetCanvasState(); 
+            if (isSorting) {
+                // Show confirmation if busy
+                confirmResetDialog.classList.remove('hidden');
+            } else {
+                // Instant reset if idle
+                resetCanvasState();
+            }
+        });
+
+        btnConfirmReset.addEventListener('click', () => {
+            confirmResetDialog.classList.add('hidden');
+            resetCanvasState();
+        });
+
+        btnCancelReset.addEventListener('click', () => {
+            confirmResetDialog.classList.add('hidden');
         });
 
         btnDownload.addEventListener('click', downloadVideo);
@@ -182,12 +264,12 @@
         // Dialog Listeners
         btnResizeFit.addEventListener('click', () => {
             resizeDialog.classList.add('hidden');
-            initCanvas(originalImage, true); // true = resize to fit
+            initCanvas(originalImage, true);
         });
 
         btnKeepOrig.addEventListener('click', () => {
             resizeDialog.classList.add('hidden');
-            initCanvas(originalImage, false); // false = keep original
+            initCanvas(originalImage, false);
         });
 
         // --- File Handling ---
@@ -221,25 +303,19 @@
             const imgW = img.width;
             const imgH = img.height;
 
-            // If image is significantly larger than screen (e.g., 20% larger), prompt user
             if (imgW > availW * 1.2 || imgH > availH * 1.2) {
-                // Populate dialog
                 dialogImgDims.textContent = `${imgW} x ${imgH}`;
                 dialogScreenDims.textContent = `${availW} x ${availH}`;
-                
-                // Show dialog
                 resizeDialog.classList.remove('hidden');
-                dropZone.classList.add('hidden'); // Hide dropzone to prevent clutter
-            } else {
-                // Fits fine, just init
                 dropZone.classList.add('hidden');
-                initCanvas(img, false); // No scaling needed
+            } else {
+                dropZone.classList.add('hidden');
+                initCanvas(img, false);
             }
         }
 
         // --- Canvas Setup & Helpers ---
         
-        // Separate function to stop animation/recording only
         function resetCanvasState() {
             if (animationId) cancelAnimationFrame(animationId);
             if (mediaRecorder && mediaRecorder.state !== 'inactive') {
@@ -248,11 +324,9 @@
             }
             isSorting = false;
             
-            // Clean up old video
             if (videoURL) URL.revokeObjectURL(videoURL);
             btnDownload.disabled = true;
             
-            // Re-enable start buttons
             btnSort.disabled = false;
             btnRecord.disabled = false;
             
@@ -260,34 +334,23 @@
             progressBar.classList.remove('bg-green-500');
             statusText.textContent = "READY";
             
-            // Re-draw initial state
-            if (pixelData && width && height) {
-                const tmpCanvas = document.createElement('canvas');
-                tmpCanvas.width = width;
-                tmpCanvas.height = height;
-                const tmpCtx = tmpCanvas.getContext('2d');
-                const imgData = new ImageData(pixelData, width, height);
-                tmpCtx.putImageData(imgData, 0, 0);
-                
-                // Restore to main canvas
-                // Actually, we usually want to reset to the UNSORTED image.
-                // Since 'originalImage' is stored, let's re-draw that based on current width/height.
+            // Reset Stats
+            statTime.textContent = "--";
+            statFrames.textContent = "--";
+            statRender.textContent = "--";
+            statFps.textContent = "--";
+            
+            // Restore Original Image
+            if (width && height && originalImage) {
                 ctx.drawImage(originalImage, 0, 0, width, height);
                 const newData = ctx.getImageData(0, 0, width, height);
-                pixelData = newData.data; // Reset pixel buffer to original
+                pixelData = newData.data;
             }
         }
 
         function initCanvas(img, resizeToFit) {
-            // 1. Reset state
-            if (animationId) cancelAnimationFrame(animationId);
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                mediaRecorder.onstop = null;
-                mediaRecorder.stop();
-            }
-            if (videoURL) URL.revokeObjectURL(videoURL);
+            resetCanvasState();
             
-            // 2. Calculate Dimensions
             let w = img.width;
             let h = img.height;
             const maxDim = 3840; // 4K cap
@@ -300,7 +363,6 @@
                 w = Math.round(w * ratio);
                 h = Math.round(h * ratio);
             } else {
-                // Even if keeping original, respect 4K limit to prevent crash
                 if (w > maxDim || h > maxDim) {
                     const ratio = Math.min(maxDim / w, maxDim / h);
                     w = Math.round(w * ratio);
@@ -308,7 +370,6 @@
                 }
             }
 
-            // 3. Apply to Canvas
             canvas.width = w;
             canvas.height = h;
             width = w;
@@ -316,16 +377,12 @@
             
             ctx.drawImage(img, 0, 0, w, h);
             
-            // 4. Data Extraction
             const imageData = ctx.getImageData(0, 0, w, h);
             pixelData = imageData.data;
 
-            // 5. UI Updates
             canvasWrapper.classList.remove('hidden');
             resDisplay.textContent = `${w} x ${h}`;
             statusText.textContent = "READY";
-            progressBar.style.width = '0%';
-            progressBar.classList.remove('bg-green-500');
             
             btnSort.disabled = false;
             btnRecord.disabled = false;
@@ -333,13 +390,10 @@
             btnDownload.disabled = true;
         }
 
-        // --- Physics Engine (The Smart Logic) ---
+        // --- Physics Engine ---
 
         function calculateWeights(data, w, h) {
-            // Formula: Value + (Hue * 0.005)
-            // Stored in Float32Array for precision
             const weights = new Float32Array(w * h);
-            
             for (let i = 0; i < w * h; i++) {
                 const idx = i * 4;
                 const r = data[idx] / 255;
@@ -356,22 +410,18 @@
                     if (max === r) hue = (g - b) / d + (g < b ? 6 : 0);
                     else if (max === g) hue = (b - r) / d + 2;
                     else if (max === b) hue = (r - g) / d + 4;
-                    hue /= 6; // 0.0 - 1.0
+                    hue /= 6;
                 }
-
-                // Hue (0-1) * 0.005 is small enough not to jump a V step
                 weights[i] = v + (hue * 0.005);
             }
             return weights;
         }
 
         function swap(i1, i2) {
-            // Swap Weights
             const tempW = weightData[i1];
             weightData[i1] = weightData[i2];
             weightData[i2] = tempW;
 
-            // Swap Pixels (RGBA)
             const p1 = i1 * 4;
             const p2 = i2 * 4;
             
@@ -398,33 +448,29 @@
             isSorting = true;
             btnSort.disabled = true;
             btnRecord.disabled = true;
-            btnReset.disabled = true;
+            btnReset.disabled = false; // Reset enabled for interrupt
             btnDownload.disabled = true;
+            
+            // Reset stats
+            stats = { startTime: Date.now(), endTime: 0, totalFrames: 0, totalRenderTime: 0 };
 
             // 1. Prepare Weights
             statusText.textContent = "CALCULATING WEIGHTS...";
-            // Allow UI update
             await new Promise(r => setTimeout(r, 10)); 
             weightData = calculateWeights(pixelData, width, height);
 
-            // 2. Setup Recording (Only if requested)
+            // 2. Setup Recording
             if (isRecordingMode) {
                 statusText.textContent = "RECORDING BUFFER...";
-                stream = canvas.captureStream(60); // 60 FPS
+                stream = canvas.captureStream(60); 
                 
-                // Robust Codec Selection
                 const mimeTypes = [
-                    'video/webm; codecs=vp9', // Chrome, Firefox (Best)
-                    'video/webm; codecs=vp8', // Fallback
-                    'video/webm',             // Generic
-                    'video/mp4'               // Safari / Others
+                    'video/webm; codecs=vp9', 
+                    'video/webm; codecs=vp8', 
+                    'video/webm',             
+                    'video/mp4'
                 ];
-
-                // Base configuration for HIGH QUALITY
-                let options = {
-                    videoBitsPerSecond: 80000000 // 80 Mbps for "Pure" quality
-                };
-                
+                let options = { videoBitsPerSecond: 80000000 };
                 let supportedType = null;
                 for (const type of mimeTypes) {
                     if (MediaRecorder.isTypeSupported(type)) {
@@ -432,10 +478,7 @@
                         break;
                     }
                 }
-
-                if (supportedType) {
-                    options.mimeType = supportedType;
-                }
+                if (supportedType) options.mimeType = supportedType;
                 
                 try {
                     mediaRecorder = new MediaRecorder(stream, options);
@@ -443,8 +486,6 @@
                     console.error('MediaRecorder init failed:', err);
                     statusText.textContent = "RECORDER ERROR (SEE CONSOLE)";
                     isSorting = false;
-                    btnSort.disabled = false;
-                    btnRecord.disabled = false;
                     btnReset.disabled = false;
                     return;
                 }
@@ -456,17 +497,18 @@
                 mediaRecorder.start();
             }
 
-            // 3. Animation Loop Setup
+            // 3. Animation Loop
             let frameCount = 0;
             let consecutiveIdleFrames = 0;
-            const maxFrames = (width + height) * 2; // Est.
+            const maxFrames = (width + height) * 2; 
             const bufferFrames = 60;
-            
-            // If recording, start with Intro. If not, jump straight to sorting.
             let loopState = isRecordingMode ? 'intro' : 'sorting'; 
 
             function step() {
                 if (!isSorting) return;
+                
+                // Track Render Time
+                const t0 = performance.now();
 
                 // --- LOGIC ---
                 if (loopState === 'intro') {
@@ -482,23 +524,20 @@
                     const isVertical = (frameCount % 2 === 0);
 
                     // Physics Pass
-                    
                     if (isVertical) {
-                        // Vertical Pass (Compare y with y+1)
-                        // Pass 0: Even rows (0, 2, 4...)
+                        // Vertical Pass
                         for (let y = 0; y < height - 1; y += 2) {
                             const rowOffset = y * width;
                             const nextRowOffset = (y + 1) * width;
                             for (let x = 0; x < width; x++) {
                                 const idx1 = rowOffset + x;
                                 const idx2 = nextRowOffset + x;
-                                if (weightData[idx1] < weightData[idx2]) { // Heavy (low val) falls (high idx)
+                                if (weightData[idx1] < weightData[idx2]) { 
                                     swap(idx1, idx2);
                                     changes = true;
                                 }
                             }
                         }
-                        // Pass 1: Odd rows (1, 3, 5...)
                         for (let y = 1; y < height - 1; y += 2) {
                             const rowOffset = y * width;
                             const nextRowOffset = (y + 1) * width;
@@ -512,21 +551,18 @@
                             }
                         }
                     } else {
-                        // Horizontal Pass (Compare x with x+1)
-                        // Pass 0: Even cols
+                        // Horizontal Pass
                         for (let y = 0; y < height; y++) {
                             const rowOffset = y * width;
                             for (let x = 0; x < width - 1; x += 2) {
                                 const idx1 = rowOffset + x;
                                 const idx2 = rowOffset + x + 1;
-                                // Heavy moves right
                                 if (weightData[idx1] < weightData[idx2]) {
                                     swap(idx1, idx2);
                                     changes = true;
                                 }
                             }
                         }
-                        // Pass 1: Odd cols
                         for (let y = 0; y < height; y++) {
                             const rowOffset = y * width;
                             for (let x = 1; x < width - 1; x += 2) {
@@ -548,18 +584,17 @@
                     if (changes) consecutiveIdleFrames = 0;
                     else consecutiveIdleFrames++;
 
-                    if (consecutiveIdleFrames >= 4) { // Little buffer to ensure stability
+                    if (consecutiveIdleFrames >= 4) { 
                         if (isRecordingMode) {
                             loopState = 'outro';
                             frameCount = 0;
                         } else {
-                            // Non-recording mode ends here
                             finishSortingOnly();
                             return; 
                         }
                     } else {
                         frameCount++;
-                        // Progress Bar
+                        stats.totalFrames++;
                         const pct = Math.min(100, (frameCount / maxFrames) * 100);
                         progressBar.style.width = `${pct}%`;
                         statusText.textContent = `SORTING... FRAME ${frameCount}`;
@@ -573,6 +608,13 @@
                         return; // Stop Loop
                     }
                 }
+                
+                // End Stats Tracking
+                const t1 = performance.now();
+                if (loopState === 'sorting') {
+                    stats.totalRenderTime += (t1 - t0);
+                }
+                updateStatsUI();
 
                 // Request next frame
                 animationId = requestAnimationFrame(step);
@@ -581,12 +623,25 @@
             step();
         }
 
+        function updateStatsUI() {
+            const elapsed = Date.now() - stats.startTime;
+            statTime.textContent = (elapsed / 1000).toFixed(1) + "s";
+            statFrames.textContent = stats.totalFrames;
+            
+            if (stats.totalFrames > 0) {
+                const avgMs = stats.totalRenderTime / stats.totalFrames;
+                statRender.textContent = avgMs.toFixed(2) + "ms";
+                // Estimate max possible FPS based on render time
+                const estFps = 1000 / avgMs;
+                statFps.textContent = estFps > 60 ? "60+" : estFps.toFixed(0);
+            }
+        }
+
         function finishSortingOnly() {
             isSorting = false;
             statusText.textContent = "SORTING COMPLETE";
             progressBar.style.width = '100%';
             btnReset.disabled = false;
-            // No download button in sort-only mode
         }
 
         function finishRecording() {
