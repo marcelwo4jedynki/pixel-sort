@@ -1,4 +1,4 @@
-# Pixel Sorter v2.5 (Web)
+# Pixel Sorter (Web)
 
 minimalist pixel sorter inspired by powdertoy and applications of pixel sorting for glitch art
 
