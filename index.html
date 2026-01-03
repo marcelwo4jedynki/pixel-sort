@@ -18,9 +18,10 @@
         /* Panning Cursors */
         .cursor-grab { cursor: grab; }
         .cursor-grabbing { cursor: grabbing; }
+        .cursor-crosshair { cursor: crosshair; }
         
         /* Canvas Transitions for smooth zoom toggle */
-        #canvas {
+        #canvas, #mask-canvas {
             transition: transform 0.1s linear; /* Fast interaction */
         }
         
@@ -64,7 +65,7 @@
     <header class="border-b-2 border-black z-30 bg-white flex flex-col shrink-0">
         <!-- Main Title Row -->
         <div class="flex justify-between items-center px-4 sm:px-6 py-3 sm:py-4">
-            <h1 class="text-lg sm:text-xl font-bold tracking-tighter uppercase truncate">Real Time Pixel Sorter <span class="hidden sm:inline text-xs font-normal opacity-50 ml-2">v3.3 Color Space</span></h1>
+            <h1 class="text-lg sm:text-xl font-bold tracking-tighter uppercase truncate">Real Time Pixel Sorter <span class="hidden sm:inline text-xs font-normal opacity-50 ml-2">v3.4 Artist Mode</span></h1>
             <div class="text-xs font-bold bg-black text-white px-2 py-1 uppercase tracking-wider transition-colors shrink-0" id="status-text">WAITING</div>
         </div>
         
@@ -157,7 +158,9 @@
              style="width: 100%; height: 100%;" 
              id="canvas-wrapper">
             
-            <canvas id="canvas" class="canvas-fit" title="Click to load a new image (or Drag to Pan in 1:1)"></canvas>
+            <canvas id="canvas" class="canvas-fit z-0" title="Click to load a new image (or Drag to Pan in 1:1)"></canvas>
+            <canvas id="mask-canvas" class="canvas-fit absolute top-0 left-0 z-10 pointer-events-none opacity-60 mix-blend-multiply hidden"></canvas>
+            
             <div id="progress-bar-container" class="absolute bottom-0 left-0 h-1 bg-black w-0 transition-all duration-300 z-10"></div>
         </div>
 
@@ -168,7 +171,8 @@
         <div class="flex flex-col gap-4 max-w-7xl mx-auto">
             
             <!-- Top Row: Config -->
-            <div class="flex flex-wrap gap-4 items-center justify-center md:justify-start text-sm text-gray-500 pb-2 border-b border-gray-100 relative">
+            <div class="flex flex-wrap gap-4 items-center justify-center text-sm text-gray-500 pb-2 border-b border-gray-100 relative">
+                
                 <span id="resolution-display" class="font-mono text-xs hidden sm:inline">0 x 0</span>
                 <div class="h-4 w-px bg-gray-300 hidden sm:block"></div>
                 
@@ -179,6 +183,17 @@
                 
                 <div class="h-4 w-px bg-gray-300 hidden sm:block"></div>
                 
+                <!-- Artist Mode Toggle -->
+                <label class="flex items-center gap-2 cursor-pointer hover:text-black select-none group">
+                    <div class="relative">
+                        <input type="checkbox" id="artist-mode-toggle" class="peer sr-only">
+                        <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-black rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-black"></div>
+                    </div>
+                    <span class="text-xs uppercase font-bold group-hover:text-black">Artist Mode</span>
+                </label>
+
+                <div class="h-4 w-px bg-gray-300 hidden sm:block"></div>
+
                 <!-- Controls Group with Titles & Help -->
                 <div class="flex flex-wrap gap-4 justify-center items-end">
                     
@@ -201,57 +216,21 @@
                         <div id="help-colorspace" class="help-popover absolute bottom-full left-0 mb-2 w-80 bg-white border-2 border-black shadow-xl p-4 z-50 text-xs text-left max-h-[80vh] overflow-y-auto">
                             <h4 class="font-bold uppercase border-b border-gray-200 pb-1 mb-2">About Color Spaces</h4>
                             <p class="text-gray-600 mb-3 leading-relaxed">
-                                A color space determines how pixels are weighted. We calculate a numerical value for every color and then sort them. The previews below show 4,096 uniformly distributed colors sorted by each algorithm, revealing the gradient curve created by that math.
+                                A color space determines how pixels are weighted. We calculate a numerical value for every color and then sort them.
                             </p>
                             
                             <div class="space-y-4">
-                                <!-- Smart -->
                                 <div class="flex gap-3 items-start">
                                     <canvas data-mode="smart" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
-                                    <div>
-                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">Smart (HSV+)</strong>
-                                        <span class="text-gray-500 leading-tight block">Sorts by Brightness, but uses Hue to break ties. Creates complex, glitchy gradients.</span>
-                                    </div>
+                                    <div><strong class="block uppercase text-[10px]">Smart</strong><span class="text-gray-500">Brightness + Hue Bias.</span></div>
                                 </div>
-                                <!-- CIELAB -->
                                 <div class="flex gap-3 items-start">
                                     <canvas data-mode="cielab" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
-                                    <div>
-                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">CIELAB (L*)</strong>
-                                        <span class="text-gray-500 leading-tight block">Perceptually accurate lightness (how the human eye sees brightness). Very smooth.</span>
-                                    </div>
+                                    <div><strong class="block uppercase text-[10px]">CIELAB</strong><span class="text-gray-500">Human eye perception.</span></div>
                                 </div>
-                                <!-- Luma -->
                                 <div class="flex gap-3 items-start">
                                     <canvas data-mode="luma" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
-                                    <div>
-                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">Luma (Rec. 709)</strong>
-                                        <span class="text-gray-500 leading-tight block">Standard video grayscale brightness. Accurate but technical.</span>
-                                    </div>
-                                </div>
-                                <!-- Classic -->
-                                <div class="flex gap-3 items-start">
-                                    <canvas data-mode="classic" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
-                                    <div>
-                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">Classic (8-bit)</strong>
-                                        <span class="text-gray-500 leading-tight block">Rounds values to step intervals. Creates sediment-like layers and banding.</span>
-                                    </div>
-                                </div>
-                                <!-- Saturation -->
-                                <div class="flex gap-3 items-start">
-                                    <canvas data-mode="sat" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
-                                    <div>
-                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">Saturation</strong>
-                                        <span class="text-gray-500 leading-tight block">Sorts from grayscale (low) to vivid neon colors (high).</span>
-                                    </div>
-                                </div>
-                                <!-- Red -->
-                                <div class="flex gap-3 items-start">
-                                    <canvas data-mode="red" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
-                                    <div>
-                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">Red Channel</strong>
-                                        <span class="text-gray-500 leading-tight block">Sorts based purely on how much Red is in the pixel.</span>
-                                    </div>
+                                    <div><strong class="block uppercase text-[10px]">Luma</strong><span class="text-gray-500">Video standard brightness.</span></div>
                                 </div>
                             </div>
                         </div>
@@ -267,11 +246,10 @@
                             <option value="y">Y Only</option>
                             <option value="x">X Only</option>
                         </select>
-                        <!-- Popover -->
                         <div id="help-axis" class="help-popover absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-white border-2 border-black shadow-xl p-3 z-50 text-xs text-left hidden">
                             <h4 class="font-bold uppercase border-b border-gray-200 pb-1 mb-2">Sorting Axis</h4>
                             <ul class="space-y-1 text-gray-600 list-disc pl-4">
-                                <li><strong>XY Mix:</strong> Alternates Horizontal/Vertical every frame for fluid 2D movement.</li>
+                                <li><strong>XY Mix:</strong> Fluid 2D movement.</li>
                                 <li><strong>Y Only:</strong> Sorts columns (Up/Down).</li>
                                 <li><strong>X Only:</strong> Sorts rows (Left/Right).</li>
                             </ul>
@@ -286,17 +264,52 @@
                         <select id="gravity-direction" class="bg-gray-50 border border-gray-200 rounded px-1 py-1 font-bold uppercase text-xs cursor-pointer outline-none hover:border-black transition-colors min-w-[80px]">
                             <!-- Populated via JS -->
                         </select>
-                        <!-- Popover -->
                         <div id="help-gravity" class="help-popover absolute bottom-full right-0 mb-2 w-48 bg-white border-2 border-black shadow-xl p-3 z-50 text-xs text-left hidden">
                             <h4 class="font-bold uppercase border-b border-gray-200 pb-1 mb-2">Gravity Direction</h4>
-                            <p class="text-gray-600 mb-2">Determines where "heavy" (bright/high-value) pixels fall.</p>
-                            <ul class="space-y-1 text-gray-600 list-disc pl-4">
-                                <li><strong>XY:</strong> Pulls pixels towards a corner.</li>
-                                <li><strong>X/Y:</strong> Pulls pixels to the edge.</li>
-                            </ul>
+                            <p class="text-gray-600">Determines where bright pixels fall.</p>
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Artist Mode Toolbar (Hidden by default) -->
+            <div id="artist-toolbar" class="hidden flex-wrap gap-4 items-center justify-center bg-gray-50 p-2 border border-gray-200 rounded-lg animate-in fade-in slide-in-from-top-2 duration-200">
+                <div class="flex items-center gap-2 border-r border-gray-300 pr-4 mr-2">
+                    <span class="text-[10px] font-bold uppercase text-gray-400">Tools</span>
+                    <!-- Tool: Brush -->
+                    <button class="tool-btn p-2 border border-transparent rounded hover:bg-white hover:border-gray-300 active:bg-gray-200 transition-all active-tool" data-tool="brush" title="Circle Brush">
+                        <i data-lucide="brush" class="w-4 h-4"></i>
+                    </button>
+                    <!-- Tool: Box -->
+                    <button class="tool-btn p-2 border border-transparent rounded hover:bg-white hover:border-gray-300 active:bg-gray-200 transition-all" data-tool="rect" title="Box Selection">
+                        <i data-lucide="box-select" class="w-4 h-4"></i>
+                    </button>
+                    <!-- Tool: Col -->
+                    <button class="tool-btn p-2 border border-transparent rounded hover:bg-white hover:border-gray-300 active:bg-gray-200 transition-all" data-tool="col" title="Column Section">
+                        <i data-lucide="columns" class="w-4 h-4"></i>
+                    </button>
+                    <!-- Tool: Row -->
+                    <button class="tool-btn p-2 border border-transparent rounded hover:bg-white hover:border-gray-300 active:bg-gray-200 transition-all" data-tool="row" title="Row Section">
+                        <i data-lucide="rows" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <!-- Brush Settings -->
+                <div class="flex items-center gap-3 border-r border-gray-300 pr-4 mr-2" id="brush-settings">
+                    <span class="text-[10px] font-bold uppercase text-gray-400">Size</span>
+                    <input type="range" id="brush-size" min="5" max="200" value="50" class="w-24 h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer">
+                </div>
+
+                <!-- Mode Settings -->
+                <div class="flex items-center gap-2">
+                     <span class="text-[10px] font-bold uppercase text-gray-400">Action</span>
+                     <div class="flex bg-white border border-gray-200 rounded overflow-hidden">
+                        <button class="draw-mode-btn px-3 py-1 text-xs font-bold uppercase hover:bg-gray-50 active-mode bg-black text-white" data-mode="draw">Draw</button>
+                        <button class="draw-mode-btn px-3 py-1 text-xs font-bold uppercase hover:bg-gray-50" data-mode="erase">Erase</button>
+                     </div>
+                </div>
+                 <!-- Clear -->
+                 <button id="btn-clear-mask" class="ml-2 text-[10px] font-bold uppercase text-red-500 hover:text-red-700 hover:underline">Clear Mask</button>
             </div>
 
             <!-- Bottom Row: Buttons -->
@@ -339,9 +352,13 @@
         const mainContainer = document.getElementById('main-container');
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
+        
+        // Canvas Layers
         const canvas = document.getElementById('canvas');
+        const maskCanvas = document.getElementById('mask-canvas');
         const canvasWrapper = document.getElementById('canvas-wrapper');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const maskCtx = maskCanvas.getContext('2d');
         
         // Dialog Elements
         const resizeDialog = document.getElementById('resize-dialog');
@@ -368,6 +385,14 @@
         const gravityInput = document.getElementById('gravity-direction');
         const colorModeInput = document.getElementById('color-mode');
         
+        // Artist Mode Elements
+        const artistToggle = document.getElementById('artist-mode-toggle');
+        const artistToolbar = document.getElementById('artist-toolbar');
+        const toolBtns = document.querySelectorAll('.tool-btn');
+        const brushSizeInput = document.getElementById('brush-size');
+        const drawModeBtns = document.querySelectorAll('.draw-mode-btn');
+        const btnClearMask = document.getElementById('btn-clear-mask');
+        
         const statusText = document.getElementById('status-text');
         const resDisplay = document.getElementById('resolution-display');
         const progressBar = document.getElementById('progress-bar-container');
@@ -382,218 +407,151 @@
         let originalImage = null;
         let animationId = null;
         let isSorting = false;
-        let currentRunIsRecording = false; // Track active mode
+        let currentRunIsRecording = false;
         
         // View State
-        let viewMode = 'fit'; // 'fit' or '1to1'
+        let viewMode = 'fit'; 
         let pan = { x: 0, y: 0 };
         let isPanning = false;
         let startPan = { x: 0, y: 0 };
-        let wasPanning = false; // Flag to prevent click event after drag
+        let wasPanning = false;
+
+        // Artist Mode State
+        let isArtistMode = false;
+        let maskData = null; // Uint8Array: 0 = locked, 1 = sortable
+        let currentTool = 'brush'; // 'brush', 'rect', 'col', 'row'
+        let isDrawing = false;
+        let drawStartPos = { x: 0, y: 0 };
+        let drawMode = 'draw'; // 'draw' or 'erase'
+        let tempMaskSnapshot = null; // For shapes preview
 
         // Statistics State
-        let stats = {
-            startTime: 0,
-            endTime: 0,
-            totalFrames: 0,
-            totalRenderTime: 0
-        };
+        let stats = { startTime: 0, endTime: 0, totalFrames: 0, totalRenderTime: 0 };
         
         // Data Buffers
-        let pixelData = null; // Uint8ClampedArray (Visuals)
-        let weightData = null; // Float32Array (Physics)
+        let pixelData = null;
+        let weightData = null;
         let width = 0;
         let height = 0;
 
         // Recording State
         let mediaRecorder = null;
         let recordedChunks = [];
-        let stream = null;
         let videoURL = null;
 
-        // --- Help System Logic ---
-        const helpTriggers = document.querySelectorAll('.help-trigger');
-        let activePopover = null;
+        // --- ARTIST MODE SETUP ---
 
-        helpTriggers.forEach(trigger => {
-            // Desktop Hover
-            trigger.addEventListener('mouseenter', (e) => {
-                if (window.matchMedia("(hover: hover)").matches) {
-                    showPopover(trigger.dataset.target);
-                }
-            });
-            trigger.addEventListener('mouseleave', (e) => {
-                if (window.matchMedia("(hover: hover)").matches) {
-                    hidePopover(trigger.dataset.target);
-                }
-            });
-            
-            // Mobile/Touch Click
-            trigger.addEventListener('click', (e) => {
-                e.stopPropagation(); // Prevent immediate close
-                const targetId = trigger.dataset.target;
-                const popover = document.getElementById(targetId);
+        artistToggle.addEventListener('change', (e) => {
+            isArtistMode = e.target.checked;
+            if (isArtistMode) {
+                artistToolbar.classList.remove('hidden');
+                artistToolbar.classList.add('flex');
+                maskCanvas.classList.remove('hidden');
+                canvasWrapper.classList.add('cursor-crosshair');
+                canvasWrapper.classList.remove('cursor-grab');
                 
-                // Toggle if same, open if different
-                if (activePopover && activePopover !== popover) {
-                    activePopover.classList.remove('active');
-                    // Removed immediate 'hidden' add to allow transition
-                    setTimeout(() => activePopover?.classList.add('hidden'), 300);
+                // Initialize mask if needed
+                if (!maskData && width > 0 && height > 0) {
+                    initMaskData();
+                    renderMaskOverlay();
                 }
-                
-                if (popover.classList.contains('active')) {
-                    hidePopover(targetId);
-                    activePopover = null;
-                } else {
-                    showPopover(targetId);
-                    activePopover = popover;
-                }
-            });
-        });
-
-        // Touch elsewhere to kill
-        document.addEventListener('click', (e) => {
-            if (activePopover && !activePopover.contains(e.target)) {
-                hidePopover(activePopover.id);
-                activePopover = null;
+            } else {
+                artistToolbar.classList.add('hidden');
+                artistToolbar.classList.remove('flex');
+                maskCanvas.classList.add('hidden');
+                canvasWrapper.classList.remove('cursor-crosshair');
+                canvasWrapper.classList.add('cursor-grab');
             }
         });
 
-        function showPopover(id) {
-            const popover = document.getElementById(id);
-            popover.classList.remove('hidden');
-            // Small delay to allow transition to render
-            requestAnimationFrame(() => {
-                popover.classList.add('active');
+        // Tool Selection
+        toolBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                toolBtns.forEach(b => {
+                    b.classList.remove('bg-black', 'text-white', 'active-tool');
+                    b.classList.add('hover:bg-white');
+                });
+                btn.classList.add('bg-black', 'text-white', 'active-tool');
+                btn.classList.remove('hover:bg-white');
+                currentTool = btn.dataset.tool;
             });
+        });
+
+        // Draw/Erase Toggle
+        drawModeBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                drawModeBtns.forEach(b => {
+                    b.classList.remove('bg-black', 'text-white');
+                    b.classList.add('hover:bg-gray-50');
+                });
+                btn.classList.add('bg-black', 'text-white');
+                btn.classList.remove('hover:bg-gray-50');
+                drawMode = btn.dataset.mode;
+            });
+        });
+
+        btnClearMask.addEventListener('click', () => {
+            if (!maskData) return;
+            maskData.fill(0);
+            renderMaskOverlay();
+        });
+
+        function initMaskData() {
+            maskData = new Uint8Array(width * height);
+            maskData.fill(0); // Start empty
         }
 
-        function hidePopover(id) {
-            const popover = document.getElementById(id);
-            popover.classList.remove('active');
-            // Wait for transition to finish before hiding
-            setTimeout(() => {
-                if (!popover.classList.contains('active')) {
-                    popover.classList.add('hidden');
-                }
-            }, 300);
-        }
-
-        // --- PREVIEW GENERATION SYSTEM ---
-        
-        window.addEventListener('load', generatePreviews);
-
-        function generatePreviews() {
-            const previews = document.querySelectorAll('.preview-canvas');
-            const pW = 64;
-            const pH = 64;
-            const totalPixels = pW * pH; // 4096
+        function renderMaskOverlay() {
+            if (!maskData || width === 0 || height === 0) return;
             
-            // 1. Generate Uniformly Distributed Color Cube
-            // We need 4096 colors. 16 * 16 * 16 = 4096.
-            // Iterate R, G, B in steps of 17 (255/15)
-            const uniformData = new Uint8ClampedArray(totalPixels * 4);
-            let idx = 0;
-            for(let r=0; r<16; r++) {
-                for(let g=0; g<16; g++) {
-                    for(let b=0; b<16; b++) {
-                        uniformData[idx*4] = r * 17;
-                        uniformData[idx*4+1] = g * 17;
-                        uniformData[idx*4+2] = b * 17;
-                        uniformData[idx*4+3] = 255;
-                        idx++;
-                    }
+            // We draw the selection as Green.
+            // Clear
+            maskCtx.clearRect(0, 0, width, height);
+            
+            const imgData = maskCtx.createImageData(width, height);
+            const data = imgData.data;
+            
+            for (let i = 0; i < width * height; i++) {
+                if (maskData[i] === 1) {
+                    const idx = i * 4;
+                    data[idx] = 0;     // R
+                    data[idx+1] = 255; // G (Green selection)
+                    data[idx+2] = 0;   // B
+                    data[idx+3] = 100; // Alpha
                 }
             }
-
-            previews.forEach(pCanvas => {
-                pCanvas.width = pW;
-                pCanvas.height = pH;
-                const pCtx = pCanvas.getContext('2d');
-                const mode = pCanvas.dataset.mode;
-                
-                // Clone data
-                const localPixelData = new Uint8ClampedArray(uniformData);
-                
-                // Calculate Weights for this specific mode
-                const weights = calculateWeights(localPixelData, pW, pH, mode);
-                
-                // --- GLOBAL SORT ---
-                // Create an index array
-                const indices = new Uint32Array(totalPixels);
-                for(let i=0; i<totalPixels; i++) indices[i] = i;
-                
-                // Sort indices based on weights
-                indices.sort((a, b) => weights[a] - weights[b]);
-                
-                // Reconstruct sorted pixel data
-                const sortedPixelData = new Uint8ClampedArray(totalPixels * 4);
-                for(let i=0; i<totalPixels; i++) {
-                    const originalIdx = indices[i];
-                    sortedPixelData[i*4] = localPixelData[originalIdx*4];
-                    sortedPixelData[i*4+1] = localPixelData[originalIdx*4+1];
-                    sortedPixelData[i*4+2] = localPixelData[originalIdx*4+2];
-                    sortedPixelData[i*4+3] = 255;
-                }
-                
-                const imageData = new ImageData(sortedPixelData, pW, pH);
-                pCtx.putImageData(imageData, 0, 0);
-            });
+            maskCtx.putImageData(imgData, 0, 0);
         }
 
+        // --- MOUSE INTERACTIONS (DRAWING VS PANNING) ---
 
-        // --- Gravity Options Logic ---
-        function updateGravityOptions() {
-            const mode = sortModeInput.value;
-            gravityInput.innerHTML = ''; // Clear existing
+        // Helper to get coordinates relative to canvas
+        function getCanvasCoords(e) {
+            const rect = canvas.getBoundingClientRect();
+            // Calculate scale in case of fit mode
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
             
-            let options = [];
-            
-            if (mode === 'xy') {
-                options = [
-                    { val: 'dr', text: '↘ Dn-Rt' },
-                    { val: 'dl', text: '↙ Dn-Lt' },
-                    { val: 'ur', text: '↗ Up-Rt' },
-                    { val: 'ul', text: '↖ Up-Lt' }
-                ];
-            } else if (mode === 'y') {
-                options = [
-                    { val: 'd', text: '↓ Down' },
-                    { val: 'u', text: '↑ Up' }
-                ];
-            } else if (mode === 'x') {
-                options = [
-                    { val: 'r', text: '→ Right' },
-                    { val: 'l', text: '← Left' }
-                ];
-            }
-            
-            options.forEach(opt => {
-                const el = document.createElement('option');
-                el.value = opt.val;
-                el.textContent = opt.text;
-                gravityInput.appendChild(el);
-            });
+            return {
+                x: Math.floor((e.clientX - rect.left) * scaleX),
+                y: Math.floor((e.clientY - rect.top) * scaleY)
+            };
         }
-        
-        // Initialize options on load
-        updateGravityOptions();
-        sortModeInput.addEventListener('change', updateGravityOptions);
-
-
-        // --- Event Listeners ---
-        dropZone.addEventListener('click', () => fileInput.click());
-        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('bg-gray-100'); });
-        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('bg-gray-100'));
-        dropZone.addEventListener('drop', handleDrop);
-        fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
-        
-        // --- Pan & Zoom Logic ---
-        
-        btnZoomToggle.addEventListener('click', toggleZoomMode);
 
         canvasWrapper.addEventListener('mousedown', (e) => {
-            if (viewMode === '1to1') {
+            if (isArtistMode && width > 0) {
+                isDrawing = true;
+                const coords = getCanvasCoords(e);
+                drawStartPos = coords;
+                
+                if (currentTool !== 'brush') {
+                    // Save snapshot for shape preview
+                    tempMaskSnapshot = new Uint8Array(maskData);
+                } else {
+                    applyBrush(coords.x, coords.y);
+                }
+            } else if (viewMode === '1to1') {
+                // Normal Panning Logic
                 isPanning = true;
                 wasPanning = false;
                 startPan.x = e.clientX - pan.x;
@@ -604,15 +562,32 @@
         });
 
         window.addEventListener('mousemove', (e) => {
-            if (isPanning && viewMode === '1to1') {
-                wasPanning = true; // User has moved, so it's a drag
+            if (isArtistMode && isDrawing && width > 0) {
+                const coords = getCanvasCoords(e);
+                
+                if (currentTool === 'brush') {
+                    applyBrush(coords.x, coords.y);
+                } else {
+                    // Shape Preview
+                    previewShape(coords.x, coords.y);
+                }
+            } else if (isPanning && viewMode === '1to1') {
+                wasPanning = true;
                 pan.x = e.clientX - startPan.x;
                 pan.y = e.clientY - startPan.y;
                 updateCanvasTransform();
             }
         });
 
-        window.addEventListener('mouseup', () => {
+        window.addEventListener('mouseup', (e) => {
+            if (isArtistMode && isDrawing) {
+                isDrawing = false;
+                const coords = getCanvasCoords(e);
+                if (currentTool !== 'brush') {
+                    applyShape(coords.x, coords.y);
+                }
+                tempMaskSnapshot = null;
+            }
             if (isPanning) {
                 isPanning = false;
                 canvasWrapper.classList.remove('cursor-grabbing');
@@ -620,296 +595,323 @@
             }
         });
 
-        // Click to Upload (Only if not panning/sorting)
-        canvasWrapper.addEventListener('click', (e) => {
-            // If we were dragging (wasPanning) in 1:1 mode, don't trigger upload
-            if (viewMode === '1to1' && wasPanning) {
-                wasPanning = false;
-                return;
-            }
-            // If sorting, ignore click
-            if (isSorting) return;
+        // --- DRAWING LOGIC ---
+
+        function applyBrush(cx, cy) {
+            const size = parseInt(brushSizeInput.value);
+            const r = size / 2;
+            const rSq = r * r;
+            const val = drawMode === 'draw' ? 1 : 0;
             
-            // Trigger upload
+            // Bounding box to optimize loop
+            const minX = Math.max(0, Math.floor(cx - r));
+            const maxX = Math.min(width, Math.ceil(cx + r));
+            const minY = Math.max(0, Math.floor(cy - r));
+            const maxY = Math.min(height, Math.ceil(cy + r));
+            
+            let changed = false;
+            for (let y = minY; y < maxY; y++) {
+                for (let x = minX; x < maxX; x++) {
+                    const dx = x - cx;
+                    const dy = y - cy;
+                    if (dx*dx + dy*dy <= rSq) {
+                        const idx = y * width + x;
+                        if (maskData[idx] !== val) {
+                            maskData[idx] = val;
+                            changed = true;
+                        }
+                    }
+                }
+            }
+            if (changed) renderMaskOverlay();
+        }
+
+        function previewShape(cx, cy) {
+            // Restore snapshot first
+            maskData.set(tempMaskSnapshot);
+            
+            const sx = drawStartPos.x;
+            const sy = drawStartPos.y;
+            const val = drawMode === 'draw' ? 1 : 0;
+            
+            fillShape(sx, sy, cx, cy, val);
+            renderMaskOverlay();
+        }
+
+        function applyShape(cx, cy) {
+            // Finalize shape
+            // (Preview already sets data, but we need to ensure it's locked in based on start/end)
+            // Actually preview restores snapshot then fills, so the data in maskData is correct currently.
+            // Just need to ensure we don't revert.
+            renderMaskOverlay();
+        }
+
+        function fillShape(x1, y1, x2, y2, val) {
+            let minX, maxX, minY, maxY;
+            
+            if (currentTool === 'rect') {
+                minX = Math.min(x1, x2);
+                maxX = Math.max(x1, x2);
+                minY = Math.min(y1, y2);
+                maxY = Math.max(y1, y2);
+            } else if (currentTool === 'col') {
+                // Vertical Strip: Width is defined by drag, Height is FULL
+                minX = Math.min(x1, x2);
+                maxX = Math.max(x1, x2);
+                minY = 0;
+                maxY = height;
+            } else if (currentTool === 'row') {
+                // Horizontal Strip: Height is defined by drag, Width is FULL
+                minX = 0;
+                maxX = width;
+                minY = Math.min(y1, y2);
+                maxY = Math.max(y1, y2);
+            }
+
+            // Clamp
+            minX = Math.max(0, minX);
+            maxX = Math.min(width, maxX);
+            minY = Math.max(0, minY);
+            maxY = Math.min(height, maxY);
+
+            for (let y = minY; y < maxY; y++) {
+                const rowOffset = y * width;
+                for (let x = minX; x < maxX; x++) {
+                    maskData[rowOffset + x] = val;
+                }
+            }
+        }
+
+
+        // --- HELP SYSTEM (EXISTING) ---
+        const helpTriggers = document.querySelectorAll('.help-trigger');
+        let activePopover = null;
+
+        helpTriggers.forEach(trigger => {
+            trigger.addEventListener('mouseenter', (e) => { if (window.matchMedia("(hover: hover)").matches) showPopover(trigger.dataset.target); });
+            trigger.addEventListener('mouseleave', (e) => { if (window.matchMedia("(hover: hover)").matches) hidePopover(trigger.dataset.target); });
+            trigger.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const targetId = trigger.dataset.target;
+                const popover = document.getElementById(targetId);
+                if (activePopover && activePopover !== popover) {
+                    activePopover.classList.remove('active');
+                    setTimeout(() => activePopover?.classList.add('hidden'), 300);
+                }
+                if (popover.classList.contains('active')) { hidePopover(targetId); activePopover = null; } 
+                else { showPopover(targetId); activePopover = popover; }
+            });
+        });
+
+        document.addEventListener('click', (e) => {
+            if (activePopover && !activePopover.contains(e.target)) { hidePopover(activePopover.id); activePopover = null; }
+        });
+
+        function showPopover(id) {
+            const popover = document.getElementById(id);
+            popover.classList.remove('hidden');
+            requestAnimationFrame(() => popover.classList.add('active'));
+        }
+
+        function hidePopover(id) {
+            const popover = document.getElementById(id);
+            popover.classList.remove('active');
+            setTimeout(() => { if (!popover.classList.contains('active')) popover.classList.add('hidden'); }, 300);
+        }
+
+        // --- PREVIEW GENERATION ---
+        window.addEventListener('load', generatePreviews);
+        function generatePreviews() {
+            const previews = document.querySelectorAll('.preview-canvas');
+            const pW = 64, pH = 64, totalPixels = pW * pH;
+            const uniformData = new Uint8ClampedArray(totalPixels * 4);
+            let idx = 0;
+            for(let r=0; r<16; r++) for(let g=0; g<16; g++) for(let b=0; b<16; b++) {
+                uniformData[idx*4] = r * 17; uniformData[idx*4+1] = g * 17; uniformData[idx*4+2] = b * 17; uniformData[idx*4+3] = 255; idx++;
+            }
+            previews.forEach(pCanvas => {
+                pCanvas.width = pW; pCanvas.height = pH;
+                const pCtx = pCanvas.getContext('2d');
+                const localPixelData = new Uint8ClampedArray(uniformData);
+                const weights = calculateWeights(localPixelData, pW, pH, pCanvas.dataset.mode);
+                const indices = new Uint32Array(totalPixels);
+                for(let i=0; i<totalPixels; i++) indices[i] = i;
+                indices.sort((a, b) => weights[a] - weights[b]);
+                const sortedPixelData = new Uint8ClampedArray(totalPixels * 4);
+                for(let i=0; i<totalPixels; i++) {
+                    const originalIdx = indices[i];
+                    sortedPixelData[i*4] = localPixelData[originalIdx*4];
+                    sortedPixelData[i*4+1] = localPixelData[originalIdx*4+1];
+                    sortedPixelData[i*4+2] = localPixelData[originalIdx*4+2];
+                    sortedPixelData[i*4+3] = 255;
+                }
+                pCtx.putImageData(new ImageData(sortedPixelData, pW, pH), 0, 0);
+            });
+        }
+
+        // --- CORE UI LOGIC ---
+        function updateGravityOptions() {
+            const mode = sortModeInput.value;
+            gravityInput.innerHTML = '';
+            let options = [];
+            if (mode === 'xy') options = [{ val: 'dr', text: '↘ Dn-Rt' }, { val: 'dl', text: '↙ Dn-Lt' }, { val: 'ur', text: '↗ Up-Rt' }, { val: 'ul', text: '↖ Up-Lt' }];
+            else if (mode === 'y') options = [{ val: 'd', text: '↓ Down' }, { val: 'u', text: '↑ Up' }];
+            else if (mode === 'x') options = [{ val: 'r', text: '→ Right' }, { val: 'l', text: '← Left' }];
+            options.forEach(opt => { const el = document.createElement('option'); el.value = opt.val; el.textContent = opt.text; gravityInput.appendChild(el); });
+        }
+        updateGravityOptions();
+        sortModeInput.addEventListener('change', updateGravityOptions);
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('bg-gray-100'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('bg-gray-100'));
+        dropZone.addEventListener('drop', handleDrop);
+        fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+        
+        btnZoomToggle.addEventListener('click', toggleZoomMode);
+        canvasWrapper.addEventListener('click', (e) => {
+            if (viewMode === '1to1' && wasPanning) { wasPanning = false; return; }
+            if (isSorting || isArtistMode) return; // Disable upload click in artist mode
             fileInput.click();
         });
 
-
-        // --- Control Listeners ---
-
         btnSort.addEventListener('click', () => startSortingProcess(false));
         btnRecord.addEventListener('click', () => startSortingProcess(true));
-        
-        btnReset.addEventListener('click', () => {
-            if (isSorting && currentRunIsRecording) {
-                // Only show confirmation if we are actually recording
-                confirmResetDialog.classList.remove('hidden');
-            } else {
-                // Instant reset for normal sorting or idle
-                resetCanvasState();
-            }
-        });
-        
+        btnReset.addEventListener('click', () => { if (isSorting && currentRunIsRecording) confirmResetDialog.classList.remove('hidden'); else resetCanvasState(); });
         btnUseInput.addEventListener('click', setAsInput);
-
-        btnConfirmReset.addEventListener('click', () => {
-            confirmResetDialog.classList.add('hidden');
-            resetCanvasState();
-        });
-
-        btnCancelReset.addEventListener('click', () => {
-            confirmResetDialog.classList.add('hidden');
-        });
-
+        btnConfirmReset.addEventListener('click', () => { confirmResetDialog.classList.add('hidden'); resetCanvasState(); });
+        btnCancelReset.addEventListener('click', () => confirmResetDialog.classList.add('hidden'));
         btnDownload.addEventListener('click', downloadVideo);
         btnFullscreen.addEventListener('click', toggleFullscreen);
+        btnResizeFit.addEventListener('click', () => { resizeDialog.classList.add('hidden'); initCanvas(originalImage, true); });
+        btnKeepOrig.addEventListener('click', () => { resizeDialog.classList.add('hidden'); initCanvas(originalImage, false); });
 
-        // Dialog Listeners
-        btnResizeFit.addEventListener('click', () => {
-            resizeDialog.classList.add('hidden');
-            initCanvas(originalImage, true);
-        });
-
-        btnKeepOrig.addEventListener('click', () => {
-            resizeDialog.classList.add('hidden');
-            initCanvas(originalImage, false);
-        });
-
-        // --- File Handling ---
+        // --- FILE HANDLING ---
         function handleDrop(e) {
-            e.preventDefault();
-            dropZone.classList.remove('bg-gray-100');
+            e.preventDefault(); dropZone.classList.remove('bg-gray-100');
             if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
         }
-
         function handleFile(file) {
             if (!file || !file.type.startsWith('image/')) return;
-
             const reader = new FileReader();
             reader.onload = (e) => {
                 const img = new Image();
-                img.onload = () => {
-                    originalImage = img;
-                    checkDimensionsAndInit(img);
-                };
+                img.onload = () => { originalImage = img; checkDimensionsAndInit(img); };
                 img.src = e.target.result;
             };
             reader.readAsDataURL(file);
         }
-
         function checkDimensionsAndInit(img) {
-            // Get available space (subtract padding)
-            const pad = 40;
-            const availW = mainContainer.clientWidth - pad;
-            const availH = mainContainer.clientHeight - pad;
-
-            const imgW = img.width;
-            const imgH = img.height;
-
-            if (imgW > availW * 1.2 || imgH > availH * 1.2) {
-                dialogImgDims.textContent = `${imgW} x ${imgH}`;
-                dialogScreenDims.textContent = `${availW} x ${availH}`;
-                resizeDialog.classList.remove('hidden');
-                dropZone.classList.add('hidden');
-            } else {
-                dropZone.classList.add('hidden');
-                initCanvas(img, false);
-            }
+            const pad = 40, availW = mainContainer.clientWidth - pad, availH = mainContainer.clientHeight - pad;
+            if (img.width > availW * 1.2 || img.height > availH * 1.2) {
+                dialogImgDims.textContent = `${img.width} x ${img.height}`; dialogScreenDims.textContent = `${availW} x ${availH}`;
+                resizeDialog.classList.remove('hidden'); dropZone.classList.add('hidden');
+            } else { dropZone.classList.add('hidden'); initCanvas(img, false); }
         }
-        
-        // --- Endless Sorting Logic ---
-        
+
+        // --- CANVAS OPS ---
         function setAsInput() {
             if (!width || !height) return;
-            
-            // 1. Snapshot Current Canvas State
             const dataURL = canvas.toDataURL();
-            
-            // 2. Stop any current sorting nicely
             if (isSorting) {
-                isSorting = false;
-                cancelAnimationFrame(animationId);
-                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                    mediaRecorder.onstop = null;
-                    mediaRecorder.stop();
-                }
-                btnSort.disabled = false;
-                btnRecord.disabled = false;
+                isSorting = false; cancelAnimationFrame(animationId);
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') { mediaRecorder.onstop = null; mediaRecorder.stop(); }
+                btnSort.disabled = false; btnRecord.disabled = false;
             }
-            
-            // 3. Update Original Image
             const newImg = new Image();
             newImg.onload = () => {
                 originalImage = newImg;
-                
-                // Immediately reset to prepare for new run
                 resetCanvasState();
-
-                // Visual Feedback
-                statusText.textContent = "IMAGE UPDATED AS INPUT";
-                statusText.classList.add('bg-blue-600', 'text-white');
-                setTimeout(() => {
-                    if (!isSorting && statusText.textContent === "IMAGE UPDATED AS INPUT") {
-                        statusText.textContent = "READY";
-                        statusText.classList.remove('bg-blue-600', 'text-white');
-                    }
-                }, 1500);
+                statusText.textContent = "IMAGE UPDATED"; statusText.classList.add('bg-blue-600', 'text-white');
+                setTimeout(() => { if (!isSorting) { statusText.textContent = "READY"; statusText.classList.remove('bg-blue-600', 'text-white'); } }, 1500);
             };
             newImg.src = dataURL;
         }
 
-        // --- Zoom Logic ---
-
         function toggleZoomMode() {
             if (!width || !height) return;
-
             if (viewMode === 'fit') {
-                // Switch to 1:1
-                viewMode = '1to1';
-                zoomLabel.textContent = "1:1 View";
-                canvas.classList.remove('canvas-fit');
-                canvas.classList.add('canvas-1to1');
-                canvasWrapper.classList.add('cursor-grab');
-                canvasWrapper.classList.remove('justify-center', 'items-center'); // Allow free movement
-                
-                // Center initially
-                const wrapperW = canvasWrapper.clientWidth;
-                const wrapperH = canvasWrapper.clientHeight;
-                pan.x = (wrapperW - width) / 2;
-                pan.y = (wrapperH - height) / 2;
-                updateCanvasTransform();
+                viewMode = '1to1'; zoomLabel.textContent = "1:1 View";
+                canvas.classList.remove('canvas-fit'); canvas.classList.add('canvas-1to1');
+                maskCanvas.classList.remove('canvas-fit'); maskCanvas.classList.add('canvas-1to1');
+                if(!isArtistMode) {
+                    canvasWrapper.classList.add('cursor-grab');
+                    canvasWrapper.classList.remove('justify-center', 'items-center');
+                }
+                const wrapperW = canvasWrapper.clientWidth, wrapperH = canvasWrapper.clientHeight;
+                pan.x = (wrapperW - width) / 2; pan.y = (wrapperH - height) / 2; updateCanvasTransform();
             } else {
-                // Switch to Fit
-                viewMode = 'fit';
-                zoomLabel.textContent = "Fit";
-                canvas.classList.add('canvas-fit');
-                canvas.classList.remove('canvas-1to1');
+                viewMode = 'fit'; zoomLabel.textContent = "Fit";
+                canvas.classList.add('canvas-fit'); canvas.classList.remove('canvas-1to1');
+                maskCanvas.classList.add('canvas-fit'); maskCanvas.classList.remove('canvas-1to1');
                 canvasWrapper.classList.remove('cursor-grab', 'cursor-grabbing');
                 canvasWrapper.classList.add('justify-center', 'items-center');
-                canvas.style.transform = ''; // Clear transform
+                canvas.style.transform = ''; maskCanvas.style.transform = '';
             }
         }
-
         function updateCanvasTransform() {
             if (viewMode === '1to1') {
                 canvas.style.transform = `translate(${pan.x}px, ${pan.y}px)`;
+                maskCanvas.style.transform = `translate(${pan.x}px, ${pan.y}px)`;
             }
         }
 
-        // --- Canvas Setup & Helpers ---
-        
         function resetCanvasState() {
             if (animationId) cancelAnimationFrame(animationId);
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                mediaRecorder.onstop = null;
-                mediaRecorder.stop();
-            }
-            isSorting = false;
-            currentRunIsRecording = false;
-            
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') { mediaRecorder.onstop = null; mediaRecorder.stop(); }
+            isSorting = false; currentRunIsRecording = false;
             if (videoURL) URL.revokeObjectURL(videoURL);
-            btnDownload.disabled = true;
+            btnDownload.disabled = true; btnSort.disabled = false; btnRecord.disabled = false; btnUseInput.disabled = false;
+            progressBar.style.width = '0%'; progressBar.classList.remove('bg-green-500'); statusText.textContent = "READY";
+            statTime.textContent = "--"; statFrames.textContent = "--"; statRender.textContent = "--"; statFps.textContent = "--";
             
-            btnSort.disabled = false;
-            btnRecord.disabled = false;
-            btnUseInput.disabled = false;
-            
-            progressBar.style.width = '0%';
-            progressBar.classList.remove('bg-green-500');
-            statusText.textContent = "READY";
-            
-            // Reset Stats
-            statTime.textContent = "--";
-            statFrames.textContent = "--";
-            statRender.textContent = "--";
-            statFps.textContent = "--";
-            
-            // Restore Original Image (This might be the new input if updated!)
             if (width && height && originalImage) {
                 ctx.drawImage(originalImage, 0, 0, width, height);
-                const newData = ctx.getImageData(0, 0, width, height);
-                pixelData = newData.data;
+                pixelData = ctx.getImageData(0, 0, width, height).data;
             }
-            
-            // Reset View
-            if (viewMode === '1to1') toggleZoomMode(); // Go back to fit on reset
+            if (viewMode === '1to1') toggleZoomMode();
         }
 
         function initCanvas(img, resizeToFit) {
             resetCanvasState();
-            
-            let w = img.width;
-            let h = img.height;
-            const maxDim = 3840; // 4K cap
-
+            let w = img.width, h = img.height; const maxDim = 3840;
             if (resizeToFit) {
-                const pad = 40;
-                const availW = mainContainer.clientWidth - pad;
-                const availH = mainContainer.clientHeight - pad;
-                const ratio = Math.min(availW / w, availH / h);
-                w = Math.round(w * ratio);
-                h = Math.round(h * ratio);
+                const pad = 40, availW = mainContainer.clientWidth - pad, availH = mainContainer.clientHeight - pad;
+                const ratio = Math.min(availW / w, availH / h); w = Math.round(w * ratio); h = Math.round(h * ratio);
             } else {
-                if (w > maxDim || h > maxDim) {
-                    const ratio = Math.min(maxDim / w, maxDim / h);
-                    w = Math.round(w * ratio);
-                    h = Math.round(h * ratio);
-                }
+                if (w > maxDim || h > maxDim) { const ratio = Math.min(maxDim / w, maxDim / h); w = Math.round(w * ratio); h = Math.round(h * ratio); }
             }
-
-            canvas.width = w;
-            canvas.height = h;
-            width = w;
-            height = h;
+            canvas.width = w; canvas.height = h;
+            maskCanvas.width = w; maskCanvas.height = h;
+            width = w; height = h;
             
             ctx.drawImage(img, 0, 0, w, h);
-            
-            const imageData = ctx.getImageData(0, 0, w, h);
-            pixelData = imageData.data;
+            pixelData = ctx.getImageData(0, 0, w, h).data;
+            initMaskData();
+            renderMaskOverlay(); // Clear any existing
 
             canvasWrapper.classList.remove('hidden');
-            resDisplay.textContent = `${w} x ${h}`;
-            statusText.textContent = "READY";
+            resDisplay.textContent = `${w} x ${h}`; statusText.textContent = "READY";
+            btnSort.disabled = false; btnRecord.disabled = false; btnReset.disabled = false; btnDownload.disabled = true; btnUseInput.disabled = false;
             
-            btnSort.disabled = false;
-            btnRecord.disabled = false;
-            btnReset.disabled = false;
-            btnDownload.disabled = true;
-            btnUseInput.disabled = false;
-            
-            // Ensure we start in fit mode
-            viewMode = 'fit';
-            zoomLabel.textContent = "Fit";
-            canvas.classList.add('canvas-fit');
-            canvas.classList.remove('canvas-1to1');
-            canvasWrapper.classList.add('justify-center', 'items-center');
-            canvasWrapper.classList.remove('cursor-grab');
-            canvas.style.transform = '';
+            viewMode = 'fit'; zoomLabel.textContent = "Fit";
+            canvas.classList.add('canvas-fit'); canvas.classList.remove('canvas-1to1');
+            maskCanvas.classList.add('canvas-fit'); maskCanvas.classList.remove('canvas-1to1');
+            canvasWrapper.classList.add('justify-center', 'items-center'); canvasWrapper.classList.remove('cursor-grab');
+            canvas.style.transform = ''; maskCanvas.style.transform = '';
         }
 
-        // --- Physics Engine (Calculates weights based on Mode) ---
-        // Updated to accept mode override for help previews
+        // --- SORTING LOGIC ---
         function calculateWeights(data, w, h, modeOverride = null) {
             const weights = new Float32Array(w * h);
             const mode = modeOverride || colorModeInput.value;
-            
             for (let i = 0; i < w * h; i++) {
                 const idx = i * 4;
-                const r = data[idx];     // 0-255
-                const g = data[idx + 1];
-                const b = data[idx + 2];
-                // Normalize 0-1 for standard calculations
-                const rn = r / 255;
-                const gn = g / 255;
-                const bn = b / 255;
-                
+                const r = data[idx], g = data[idx+1], b = data[idx+2];
+                const rn = r/255, gn = g/255, bn = b/255;
                 let weight = 0;
-
                 if (mode === 'smart') {
-                    // Smart (HSV): Value + Hue Bias
-                    const max = Math.max(rn, gn, bn);
-                    const min = Math.min(rn, gn, bn);
-                    const d = max - min;
+                    const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn), d = max - min;
                     let hue = 0;
                     if (max !== min) {
                         if (max === rn) hue = (gn - bn) / d + (gn < bn ? 6 : 0);
@@ -919,356 +921,153 @@
                     }
                     weight = max + (hue * 0.005);
                 } 
-                else if (mode === 'classic') {
-                    // Classic: 8-bit quantized luminance (mimics retro behavior)
-                    const luma = (0.299 * r + 0.587 * g + 0.114 * b);
-                    // Quantize to steps of 24 (or similar retro feel) to force banding
-                    weight = Math.floor(luma / 24) * 24; 
-                }
+                else if (mode === 'classic') { weight = Math.floor((0.299*r + 0.587*g + 0.114*b)/24)*24; }
                 else if (mode === 'cielab') {
-                    // CIELAB L*: Perceptual Lightness (Approximation)
-                    // 1. RGB to Linear
                     const lin = (c) => (c <= 0.04045) ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-                    const Rl = lin(rn), Gl = lin(gn), Bl = lin(bn);
-                    // 2. Linear RGB to Y (Luminance part of XYZ)
-                    const Y = 0.2126 * Rl + 0.7152 * Gl + 0.0722 * Bl;
-                    // 3. Y to L*
-                    const Yn = 1.0; // Reference white
+                    const Y = 0.2126 * lin(rn) + 0.7152 * lin(gn) + 0.0722 * lin(bn);
                     const f = (t) => (t > 0.008856) ? Math.pow(t, 1/3) : (7.787 * t) + (16 / 116);
-                    weight = (116 * f(Y / Yn)) - 16;
+                    weight = (116 * f(Y)) - 16;
                 }
-                else if (mode === 'luma') {
-                    // Rec. 709 Luminance (High Precision)
-                    weight = 0.2126 * rn + 0.7152 * gn + 0.0722 * bn;
-                }
-                else if (mode === 'sat') {
-                    // Saturation
-                    const max = Math.max(rn, gn, bn);
-                    const min = Math.min(rn, gn, bn);
-                    weight = (max === 0) ? 0 : (max - min) / max;
-                }
-                else if (mode === 'red') {
-                    // Red Isolation (with tiny bias to prevent collisions)
-                    weight = rn + (gn * 0.001) + (bn * 0.001);
-                }
-                else if (mode === 'green') {
-                    weight = gn + (rn * 0.001) + (bn * 0.001);
-                }
-                else if (mode === 'blue') {
-                    weight = bn + (rn * 0.001) + (gn * 0.001);
-                }
-                
+                else if (mode === 'luma') { weight = 0.2126 * rn + 0.7152 * gn + 0.0722 * bn; }
+                else if (mode === 'sat') { const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn); weight = (max === 0) ? 0 : (max - min) / max; }
+                else if (mode === 'red') weight = rn + gn*0.001 + bn*0.001;
+                else if (mode === 'green') weight = gn + rn*0.001 + bn*0.001;
+                else if (mode === 'blue') weight = bn + rn*0.001 + gn*0.001;
                 weights[i] = weight;
             }
             return weights;
         }
 
         function swap(i1, i2) {
-            const tempW = weightData[i1];
-            weightData[i1] = weightData[i2];
-            weightData[i2] = tempW;
-
-            const p1 = i1 * 4;
-            const p2 = i2 * 4;
-            
-            const r = pixelData[p1];
-            const g = pixelData[p1+1];
-            const b = pixelData[p1+2];
-            const a = pixelData[p1+3];
-
-            pixelData[p1] = pixelData[p2];
-            pixelData[p1+1] = pixelData[p2+1];
-            pixelData[p1+2] = pixelData[p2+2];
-            pixelData[p1+3] = pixelData[p2+3];
-
-            pixelData[p2] = r;
-            pixelData[p2+1] = g;
-            pixelData[p2+2] = b;
-            pixelData[p2+3] = a;
+            const tempW = weightData[i1]; weightData[i1] = weightData[i2]; weightData[i2] = tempW;
+            const p1 = i1 * 4, p2 = i2 * 4;
+            const r = pixelData[p1], g = pixelData[p1+1], b = pixelData[p1+2], a = pixelData[p1+3];
+            pixelData[p1] = pixelData[p2]; pixelData[p1+1] = pixelData[p2+1]; pixelData[p1+2] = pixelData[p2+2]; pixelData[p1+3] = pixelData[p2+3];
+            pixelData[p2] = r; pixelData[p2+1] = g; pixelData[p2+2] = b; pixelData[p2+3] = a;
         }
-
-        // --- Sorting Animation Loop ---
 
         async function startSortingProcess(isRecordingMode) {
             if (isSorting) return;
             isSorting = true;
             currentRunIsRecording = isRecordingMode;
-            btnSort.disabled = true;
-            btnRecord.disabled = true;
-            btnReset.disabled = false; // Reset enabled for interrupt
-            btnUseInput.disabled = false; // Allow "Use as Input" during sort to capture intermediate state
-            btnDownload.disabled = true;
+            btnSort.disabled = true; btnRecord.disabled = true; btnReset.disabled = false; btnUseInput.disabled = false; btnDownload.disabled = true;
             
-            // Get Mode & Gravity
             const mode = sortModeInput.value;
             const gravity = gravityInput.value;
+            let invertX = gravity.includes('l'), invertY = gravity.includes('u');
             
-            // Determine inversion based on direction selected
-            let invertX = false;
-            let invertY = false;
-            
-            if (gravity.includes('u')) invertY = true;  // Up
-            if (gravity.includes('l')) invertX = true;  // Left
-            
-            // Reset stats
-            stats = { startTime: Date.now(), endTime: 0, totalFrames: 0, totalRenderTime: 0 };
+            // Check if we have an active mask
+            let hasActiveMask = false;
+            if (isArtistMode && maskData) {
+                // Quick check if mask is empty
+                for(let i=0; i<maskData.length; i++) {
+                    if (maskData[i] === 1) { hasActiveMask = true; break; }
+                }
+            }
 
-            // 1. Prepare Weights
+            stats = { startTime: Date.now(), endTime: 0, totalFrames: 0, totalRenderTime: 0 };
             statusText.textContent = "CALCULATING WEIGHTS...";
             await new Promise(r => setTimeout(r, 10)); 
             weightData = calculateWeights(pixelData, width, height);
 
-            // 2. Setup Recording
             if (isRecordingMode) {
                 statusText.textContent = "RECORDING BUFFER...";
                 stream = canvas.captureStream(60); 
-                
-                const mimeTypes = [
-                    'video/webm; codecs=vp9', 
-                    'video/webm; codecs=vp8', 
-                    'video/webm',             
-                    'video/mp4'
-                ];
-                let options = { videoBitsPerSecond: 80000000 };
-                let supportedType = null;
-                for (const type of mimeTypes) {
-                    if (MediaRecorder.isTypeSupported(type)) {
-                        supportedType = type;
-                        break;
-                    }
-                }
-                if (supportedType) options.mimeType = supportedType;
-                
                 try {
-                    mediaRecorder = new MediaRecorder(stream, options);
-                } catch (err) {
-                    console.error('MediaRecorder init failed:', err);
-                    statusText.textContent = "RECORDER ERROR (SEE CONSOLE)";
-                    isSorting = false;
-                    btnReset.disabled = false;
-                    return;
-                }
-
+                    mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9', videoBitsPerSecond: 80000000 });
+                } catch (e) { mediaRecorder = new MediaRecorder(stream); }
                 recordedChunks = [];
-                mediaRecorder.ondataavailable = (e) => {
-                    if (e.data.size > 0) recordedChunks.push(e.data);
-                };
+                mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
                 mediaRecorder.start();
             }
 
-            // 3. Animation Loop
-            let frameCount = 0;
-            let consecutiveIdleFrames = 0;
+            let frameCount = 0, consecutiveIdleFrames = 0;
             const maxFrames = (width + height) * 2; 
-            const bufferFrames = 60;
             let loopState = isRecordingMode ? 'intro' : 'sorting'; 
 
             function step() {
                 if (!isSorting) return;
-                
-                // Track Render Time
                 const t0 = performance.now();
 
-                // --- LOGIC ---
                 if (loopState === 'intro') {
-                    frameCount++;
-                    statusText.textContent = `RECORDING INTRO (${Math.floor((frameCount/bufferFrames)*100)}%)`;
-                    if (frameCount >= bufferFrames) {
-                        loopState = 'sorting';
-                        frameCount = 0;
-                    }
+                    frameCount++; statusText.textContent = `RECORDING INTRO (${Math.floor((frameCount/60)*100)}%)`;
+                    if (frameCount >= 60) { loopState = 'sorting'; frameCount = 0; }
                 } 
                 else if (loopState === 'sorting') {
                     let changes = false;
-                    
-                    // Determine which pass to run based on Mode
-                    let performVertical = false;
-                    let performHorizontal = false;
-                    
-                    if (mode === 'xy') {
-                        if (frameCount % 2 === 0) performVertical = true;
-                        else performHorizontal = true;
-                    } else if (mode === 'y') {
-                        performVertical = true;
-                    } else if (mode === 'x') {
-                        performHorizontal = true;
-                    }
+                    let performVertical = (mode === 'xy' && frameCount % 2 === 0) || mode === 'y';
+                    let performHorizontal = (mode === 'xy' && frameCount % 2 !== 0) || mode === 'x';
 
-                    // Physics Pass
                     if (performVertical) {
-                        // Vertical Pass
-                        for (let y = 0; y < height - 1; y += 2) {
-                            const rowOffset = y * width;
-                            const nextRowOffset = (y + 1) * width;
-                            for (let x = 0; x < width; x++) {
-                                const idx1 = rowOffset + x;
-                                const idx2 = nextRowOffset + x;
-                                let shouldSwap = invertY 
-                                    ? (weightData[idx1] > weightData[idx2]) 
-                                    : (weightData[idx1] < weightData[idx2]);
-                                    
-                                if (shouldSwap) { 
-                                    swap(idx1, idx2);
-                                    changes = true;
-                                }
-                            }
-                        }
-                        for (let y = 1; y < height - 1; y += 2) {
-                            const rowOffset = y * width;
-                            const nextRowOffset = (y + 1) * width;
-                            for (let x = 0; x < width; x++) {
-                                const idx1 = rowOffset + x;
-                                const idx2 = nextRowOffset + x;
-                                let shouldSwap = invertY 
-                                    ? (weightData[idx1] > weightData[idx2]) 
-                                    : (weightData[idx1] < weightData[idx2]);
-
-                                if (shouldSwap) {
-                                    swap(idx1, idx2);
-                                    changes = true;
-                                }
-                            }
-                        }
+                        for (let y = 0; y < height - 1; y += 2) processRowPair(y, y+1);
+                        for (let y = 1; y < height - 1; y += 2) processRowPair(y, y+1);
                     } 
-                    
                     if (performHorizontal) {
-                        // Horizontal Pass
                         for (let y = 0; y < height; y++) {
                             const rowOffset = y * width;
-                            for (let x = 0; x < width - 1; x += 2) {
-                                const idx1 = rowOffset + x;
-                                const idx2 = rowOffset + x + 1;
-                                let shouldSwap = invertX 
-                                    ? (weightData[idx1] > weightData[idx2]) 
-                                    : (weightData[idx1] < weightData[idx2]);
-
-                                if (shouldSwap) {
-                                    swap(idx1, idx2);
-                                    changes = true;
-                                }
-                            }
-                        }
-                        for (let y = 0; y < height; y++) {
-                            const rowOffset = y * width;
-                            for (let x = 1; x < width - 1; x += 2) {
-                                const idx1 = rowOffset + x;
-                                const idx2 = rowOffset + x + 1;
-                                let shouldSwap = invertX 
-                                    ? (weightData[idx1] > weightData[idx2]) 
-                                    : (weightData[idx1] < weightData[idx2]);
-
-                                if (shouldSwap) {
-                                    swap(idx1, idx2);
-                                    changes = true;
-                                }
-                            }
+                            for (let x = 0; x < width - 1; x += 2) processSwap(rowOffset+x, rowOffset+x+1, invertX);
+                            for (let x = 1; x < width - 1; x += 2) processSwap(rowOffset+x, rowOffset+x+1, invertX);
                         }
                     }
 
-                    // Update UI
-                    const newImageData = new ImageData(pixelData, width, height);
-                    ctx.putImageData(newImageData, 0, 0);
+                    function processRowPair(y1, y2) {
+                        const r1 = y1 * width, r2 = y2 * width;
+                        for (let x = 0; x < width; x++) processSwap(r1+x, r2+x, invertY);
+                    }
 
-                    // Check Stability
-                    if (changes) consecutiveIdleFrames = 0;
-                    else consecutiveIdleFrames++;
-
-                    if (consecutiveIdleFrames >= 4) { 
-                        if (isRecordingMode) {
-                            loopState = 'outro';
-                            frameCount = 0;
-                        } else {
-                            finishSortingOnly();
-                            return; 
+                    function processSwap(idx1, idx2, invert) {
+                        // MASK CHECK: If masking is active, only swap if BOTH pixels are selected (1)
+                        if (hasActiveMask) {
+                            if (maskData[idx1] === 0 || maskData[idx2] === 0) return;
                         }
+
+                        let shouldSwap = invert ? (weightData[idx1] > weightData[idx2]) : (weightData[idx1] < weightData[idx2]);
+                        if (shouldSwap) { swap(idx1, idx2); changes = true; }
+                    }
+
+                    ctx.putImageData(new ImageData(pixelData, width, height), 0, 0);
+
+                    if (changes) consecutiveIdleFrames = 0; else consecutiveIdleFrames++;
+                    if (consecutiveIdleFrames >= 4) { 
+                        if (isRecordingMode) { loopState = 'outro'; frameCount = 0; } else { finishSortingOnly(); return; }
                     } else {
-                        frameCount++;
-                        stats.totalFrames++;
-                        // For single axis modes, progress bar might be inaccurate since maxFrames estimates XY travel
-                        // But it's just an estimate, so it's fine.
-                        const pct = Math.min(100, (frameCount / maxFrames) * 100);
-                        progressBar.style.width = `${pct}%`;
+                        frameCount++; stats.totalFrames++;
+                        progressBar.style.width = `${Math.min(100, (frameCount / maxFrames) * 100)}%`;
                         statusText.textContent = `SORTING... FRAME ${frameCount}`;
                     }
                 } 
                 else if (loopState === 'outro') {
-                    frameCount++;
-                    statusText.textContent = `RECORDING OUTRO (${Math.floor((frameCount/bufferFrames)*100)}%)`;
-                    if (frameCount >= bufferFrames) {
-                        finishRecording();
-                        return; // Stop Loop
-                    }
+                    frameCount++; statusText.textContent = `RECORDING OUTRO (${Math.floor((frameCount/60)*100)}%)`;
+                    if (frameCount >= 60) { finishRecording(); return; }
                 }
                 
-                // End Stats Tracking
-                const t1 = performance.now();
-                if (loopState === 'sorting') {
-                    stats.totalRenderTime += (t1 - t0);
-                }
+                stats.totalRenderTime += (performance.now() - t0);
                 updateStatsUI();
-
-                // Request next frame
                 animationId = requestAnimationFrame(step);
             }
-
             step();
         }
 
         function updateStatsUI() {
-            const elapsed = Date.now() - stats.startTime;
-            statTime.textContent = (elapsed / 1000).toFixed(1) + "s";
+            statTime.textContent = ((Date.now() - stats.startTime) / 1000).toFixed(1) + "s";
             statFrames.textContent = stats.totalFrames;
-            
             if (stats.totalFrames > 0) {
                 const avgMs = stats.totalRenderTime / stats.totalFrames;
                 statRender.textContent = avgMs.toFixed(2) + "ms";
-                // Estimate max possible FPS based on render time
-                const estFps = 1000 / avgMs;
-                statFps.textContent = estFps > 60 ? "60+" : estFps.toFixed(0);
+                statFps.textContent = (1000 / avgMs).toFixed(0);
             }
         }
-
-        function finishSortingOnly() {
-            isSorting = false;
-            statusText.textContent = "SORTING COMPLETE";
-            progressBar.style.width = '100%';
-            btnReset.disabled = false;
-        }
-
+        function finishSortingOnly() { isSorting = false; statusText.textContent = "SORTING COMPLETE"; progressBar.style.width = '100%'; btnReset.disabled = false; }
         function finishRecording() {
-            isSorting = false;
-            statusText.textContent = "FINALIZING VIDEO...";
-            mediaRecorder.stop();
+            isSorting = false; statusText.textContent = "FINALIZING VIDEO..."; mediaRecorder.stop();
             mediaRecorder.onstop = () => {
-                const blob = new Blob(recordedChunks, { type: 'video/webm' });
-                videoURL = URL.createObjectURL(blob);
+                videoURL = URL.createObjectURL(new Blob(recordedChunks, { type: 'video/webm' }));
                 statusText.textContent = "COMPLETE. DOWNLOAD READY.";
-                btnReset.disabled = false;
-                btnDownload.disabled = false;
-                progressBar.style.width = '100%';
-                progressBar.classList.add('bg-green-500');
+                btnReset.disabled = false; btnDownload.disabled = false; progressBar.style.width = '100%'; progressBar.classList.add('bg-green-500');
             };
         }
-
-        function downloadVideo() {
-            if (!videoURL) return;
-            const a = document.createElement('a');
-            a.href = videoURL;
-            a.download = 'pixel_sort_result.webm';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
-
-        function toggleFullscreen() {
-            if (!document.fullscreenElement) {
-                canvasWrapper.requestFullscreen().catch(err => {
-                    console.error(`Error attempting to enable fullscreen: ${err.message}`);
-                });
-            } else {
-                document.exitFullscreen();
-            }
-        }
+        function downloadVideo() { if (videoURL) { const a = document.createElement('a'); a.href = videoURL; a.download = 'pixel_sort_result.webm'; document.body.appendChild(a); a.click(); document.body.removeChild(a); } }
+        function toggleFullscreen() { if (!document.fullscreenElement) canvasWrapper.requestFullscreen(); else document.exitFullscreen(); }
     </script>
 </body>
 </html>
