@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Real Time Pixel Sorter</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -68,6 +68,11 @@
             visibility: visible;
             transform: translateY(0);
             transition-delay: 0s; /* Instant appearance */
+        }
+
+        /* Prevent touch scrolling on canvas area */
+        #canvas-wrapper {
+            touch-action: none;
         }
     </style>
 </head>
@@ -664,21 +669,23 @@
             maskCtx.putImageData(imgData, 0, 0);
         }
 
-        // --- MOUSE INTERACTIONS (DRAWING VS PANNING) ---
+        // --- MOUSE & TOUCH INTERACTIONS (DRAWING VS PANNING) ---
 
         // Helper to get coordinates relative to canvas
-        function getCanvasCoords(e) {
+        function getCanvasCoords(input) {
+            // 'input' can be mouse event or touch object, basically anything with clientX/Y
             const rect = canvas.getBoundingClientRect();
             // Calculate scale in case of fit mode
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
             
             return {
-                x: Math.floor((e.clientX - rect.left) * scaleX),
-                y: Math.floor((e.clientY - rect.top) * scaleY)
+                x: Math.floor((input.clientX - rect.left) * scaleX),
+                y: Math.floor((input.clientY - rect.top) * scaleY)
             };
         }
 
+        // --- MOUSE LISTENERS ---
         canvasWrapper.addEventListener('mousedown', (e) => {
             if (isArtistMode && width > 0) {
                 isDrawing = true;
@@ -736,6 +743,68 @@
                 if (viewMode === '1to1') canvasWrapper.classList.add('cursor-grab');
             }
         });
+
+        // --- TOUCH LISTENERS (MOBILE SUPPORT) ---
+        canvasWrapper.addEventListener('touchstart', (e) => {
+            if(e.cancelable) e.preventDefault(); // Stop scrolling while using canvas
+            const touch = e.touches[0];
+            
+            if (isArtistMode && width > 0) {
+                isDrawing = true;
+                saveMaskHistory(); 
+                const coords = getCanvasCoords(touch);
+                drawStartPos = coords;
+                
+                if (currentTool !== 'brush') {
+                    tempMaskSnapshot = new Uint8Array(maskData);
+                } else {
+                    applyBrush(coords.x, coords.y);
+                }
+            } else if (viewMode === '1to1') {
+                isPanning = true;
+                wasPanning = false;
+                startPan.x = touch.clientX - pan.x;
+                startPan.y = touch.clientY - pan.y;
+            }
+        }, { passive: false });
+
+        window.addEventListener('touchmove', (e) => {
+            if (!isDrawing && !isPanning) return;
+            if(e.cancelable) e.preventDefault();
+            const touch = e.touches[0];
+            
+            if (isArtistMode && isDrawing && width > 0) {
+                const coords = getCanvasCoords(touch);
+                if (currentTool === 'brush') {
+                    applyBrush(coords.x, coords.y);
+                } else {
+                    previewShape(coords.x, coords.y);
+                }
+            } else if (isPanning && viewMode === '1to1') {
+                wasPanning = true;
+                pan.x = touch.clientX - startPan.x;
+                pan.y = touch.clientY - startPan.y;
+                updateCanvasTransform();
+            }
+        }, { passive: false });
+
+        window.addEventListener('touchend', (e) => {
+            if (isArtistMode && isDrawing) {
+                isDrawing = false;
+                // For touchend, use changedTouches to find where finger lifted
+                const touch = e.changedTouches[0];
+                const coords = getCanvasCoords(touch);
+                if (currentTool !== 'brush') {
+                    applyShape(coords.x, coords.y);
+                }
+                tempMaskSnapshot = null;
+            }
+            if (isPanning) {
+                isPanning = false;
+                // Cursor classes not needed for touch
+            }
+        });
+
 
         // --- DRAWING LOGIC ---
 
