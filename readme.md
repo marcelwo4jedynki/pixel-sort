@@ -1,16 +1,22 @@
-# Pixel Sorter (Web)
+# Real Time Pixel Sorter (Web)
 
-minimalist pixel sorter inspired by powdertoy and applications of pixel sorting in glitch art
+minimalist pixel sorter inspired by powdertoy and use of pixel sorting in glitch art
+
+each color gets assigned a weight, then they get sorted by gravity
 
 ## Key Features
+
+* **Alternating Gravity**: Physics toggle between vertical and horizontal passes every frame to ensure complex 2D gradients.
+
+* **Resolution Handling**: Supports up to 4K images with workspace size detection that suggests optimal scaling for real-time performance.
 
 * **High-Fidelity Recording**: Generates "Pure" WebM files at up to 80Mbps bitrate to eliminate compression artifacts.
 
 * **Smart Color Sorting**: Uses a specialized (Value + Hue Bias) weight formula to prevent thick sediment layers and create clean color transitions.
 
-* **Resolution Handling**: Supports up to 4K images with a smart workspace detector that suggests optimal scaling for real-time performance.
 
-* **Alternating Gravity**: Physics toggle between vertical and horizontal passes every frame to ensure complex 2D gradients.
+
+
 
 * **Process Statistics**: Live tracking of render times, average frame duration, and estimated FPS.
 
