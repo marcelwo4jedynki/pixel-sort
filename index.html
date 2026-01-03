@@ -14,13 +14,16 @@
         
         /* Hide cursor in fullscreen if needed */
         .fullscreen-canvas { cursor: none; }
+        
+        /* Indicate canvas is clickable for new upload */
+        #canvas { cursor: pointer; }
     </style>
 </head>
 <body class="bg-white text-black font-mono antialiased flex flex-col h-screen overflow-hidden selection:bg-black selection:text-white">
 
     <!-- Header -->
     <header class="flex justify-between items-center px-6 py-4 border-b-2 border-black">
-        <h1 class="text-xl font-bold tracking-tighter uppercase">Pixel Sorter <span class="text-xs font-normal opacity-50 ml-2">v2.1 Web</span></h1>
+        <h1 class="text-xl font-bold tracking-tighter uppercase">Pixel Sorter <span class="text-xs font-normal opacity-50 ml-2">v2.2 Web</span></h1>
         <div class="text-xs" id="status-text">WAITING FOR IMAGE</div>
     </header>
 
@@ -36,7 +39,7 @@
 
         <!-- Canvas Container -->
         <div class="relative shadow-2xl border-4 border-black hidden" id="canvas-wrapper">
-            <canvas id="canvas"></canvas>
+            <canvas id="canvas" title="Click to load a new image"></canvas>
             <!-- Progress Overlay -->
             <div id="progress-bar-container" class="absolute bottom-0 left-0 h-1 bg-black w-0 transition-all duration-300"></div>
         </div>
@@ -123,6 +126,9 @@
         dropZone.addEventListener('drop', handleDrop);
         fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
         
+        // Allow clicking canvas to upload new image instantly
+        canvas.addEventListener('click', () => fileInput.click());
+
         btnSort.addEventListener('click', () => startSortingProcess(false));
         btnRecord.addEventListener('click', () => startSortingProcess(true));
         
@@ -164,7 +170,11 @@
 
             // Stop any running process
             if (animationId) cancelAnimationFrame(animationId);
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                // Important: nullify onstop so the old recording doesn't overwrite our status
+                mediaRecorder.onstop = null;
+                mediaRecorder.stop();
+            }
             isSorting = false;
             
             // Clean up old video
