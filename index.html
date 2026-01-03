@@ -77,7 +77,7 @@
     <header class="border-b-2 border-black z-30 bg-white flex flex-col shrink-0">
         <!-- Main Title Row -->
         <div class="flex justify-between items-center px-4 sm:px-6 py-3 sm:py-4">
-            <h1 class="text-lg sm:text-xl font-bold tracking-tighter uppercase truncate">Real Time Pixel Sorter <span class="hidden sm:inline text-xs font-normal opacity-50 ml-2">v3.5 Artist Mode</span></h1>
+            <h1 class="text-lg sm:text-xl font-bold tracking-tighter uppercase truncate">Real Time Pixel Sorter <span class="hidden sm:inline text-xs font-normal opacity-50 ml-2">v3.7 Artist Mode</span></h1>
             <div class="text-xs font-bold bg-black text-white px-2 py-1 uppercase tracking-wider transition-colors shrink-0" id="status-text">WAITING</div>
         </div>
         
@@ -247,8 +247,8 @@
                             Color Space <i data-lucide="help-circle" class="w-3 h-3"></i>
                         </div>
                         <select id="color-mode" class="bg-gray-50 border border-gray-200 rounded px-1 py-1 font-bold uppercase text-xs cursor-pointer outline-none hover:border-black transition-colors min-w-[100px]">
+                            <option value="cielab" selected>CIELAB (L*)</option>
                             <option value="smart">Smart (HSV+)</option>
-                            <option value="cielab">CIELAB (L*)</option>
                             <option value="luma">Luma (709)</option>
                             <option value="classic">Classic (8b)</option>
                             <option value="sat">Saturation</option>
@@ -264,20 +264,20 @@
                             </p>
                             
                             <div class="space-y-4">
-                                <!-- Smart -->
-                                <div class="flex gap-3 items-start">
-                                    <canvas data-mode="smart" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
-                                    <div>
-                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">Smart (HSV+)</strong>
-                                        <span class="text-gray-500 leading-tight block">Sorts by Brightness, but uses Hue to break ties. Creates complex, glitchy gradients.</span>
-                                    </div>
-                                </div>
                                 <!-- CIELAB -->
                                 <div class="flex gap-3 items-start">
                                     <canvas data-mode="cielab" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
                                     <div>
                                         <strong class="block uppercase text-[10px] tracking-wide mb-1">CIELAB (L*)</strong>
                                         <span class="text-gray-500 leading-tight block">Perceptually accurate lightness (how the human eye sees brightness). Very smooth.</span>
+                                    </div>
+                                </div>
+                                <!-- Smart -->
+                                <div class="flex gap-3 items-start">
+                                    <canvas data-mode="smart" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
+                                    <div>
+                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">Smart (HSV+)</strong>
+                                        <span class="text-gray-500 leading-tight block">Sorts by Brightness, but uses Hue to break ties. Creates complex, glitchy gradients.</span>
                                     </div>
                                 </div>
                                 <!-- Luma -->
@@ -349,6 +349,11 @@
                             <p class="text-gray-600">Determines where bright pixels fall.</p>
                         </div>
                     </div>
+
+                    <!-- DEFAULTS Button -->
+                     <button id="btn-defaults" class="ml-2 px-2 py-1 bg-gray-100 border border-gray-300 text-[10px] uppercase font-bold text-gray-400 hover:text-black hover:border-black transition-colors" title="Reset Settings & Disable Artist Mode">
+                        Default
+                     </button>
                 </div>
             </div>
 
@@ -388,8 +393,18 @@
                         <button class="draw-mode-btn px-3 py-1 text-xs font-bold uppercase hover:bg-gray-50" data-mode="erase">Erase</button>
                      </div>
                 </div>
-                 <!-- Clear -->
-                 <button id="btn-clear-mask" class="ml-2 text-[10px] font-bold uppercase text-red-500 hover:text-red-700 hover:underline">Clear Mask</button>
+                 
+                 <!-- Mask Actions -->
+                 <div class="flex items-center ml-2 gap-2 border-l border-gray-300 pl-4">
+                     <!-- Undo -->
+                     <button id="btn-undo-mask" class="p-1 hover:bg-white rounded hover:text-black text-gray-500 transition-colors" title="Undo Mask Change">
+                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                     </button>
+                     <!-- Invert -->
+                     <button id="btn-invert-mask" class="text-[10px] font-bold uppercase text-black hover:text-gray-600 hover:underline">Invert</button>
+                     <!-- Clear -->
+                     <button id="btn-clear-mask" class="text-[10px] font-bold uppercase text-red-500 hover:text-red-700 hover:underline">Clear</button>
+                 </div>
             </div>
 
             <!-- Bottom Row: Buttons -->
@@ -471,6 +486,7 @@
         const sortModeInput = document.getElementById('sort-mode');
         const gravityInput = document.getElementById('gravity-direction');
         const colorModeInput = document.getElementById('color-mode');
+        const btnDefaults = document.getElementById('btn-defaults');
         
         // Artist Mode Elements
         const artistToggle = document.getElementById('artist-mode-toggle');
@@ -479,6 +495,8 @@
         const brushSizeInput = document.getElementById('brush-size');
         const drawModeBtns = document.querySelectorAll('.draw-mode-btn');
         const btnClearMask = document.getElementById('btn-clear-mask');
+        const btnInvertMask = document.getElementById('btn-invert-mask');
+        const btnUndoMask = document.getElementById('btn-undo-mask');
         
         const statusText = document.getElementById('status-text');
         const resDisplay = document.getElementById('resolution-display');
@@ -506,6 +524,7 @@
         // Artist Mode State
         let isArtistMode = false;
         let maskData = null; // Uint8Array: 0 = locked, 1 = sortable
+        let maskHistory = []; // Undo stack
         let currentTool = 'brush'; // 'brush', 'rect', 'col', 'row'
         let isDrawing = false;
         let drawStartPos = { x: 0, y: 0 };
@@ -577,15 +596,39 @@
             });
         });
 
+        function saveMaskHistory() {
+             if (!maskData) return;
+             if (maskHistory.length > 20) maskHistory.shift(); // Limit stack
+             maskHistory.push(new Uint8Array(maskData));
+        }
+
+        btnUndoMask.addEventListener('click', () => {
+             if (maskHistory.length === 0 || !maskData) return;
+             const prev = maskHistory.pop();
+             maskData.set(prev);
+             renderMaskOverlay();
+        });
+
         btnClearMask.addEventListener('click', () => {
             if (!maskData) return;
+            saveMaskHistory();
             maskData.fill(0);
+            renderMaskOverlay();
+        });
+
+        btnInvertMask.addEventListener('click', () => {
+            if (!maskData) return;
+            saveMaskHistory();
+            for (let i = 0; i < maskData.length; i++) {
+                maskData[i] = maskData[i] === 1 ? 0 : 1;
+            }
             renderMaskOverlay();
         });
 
         function initMaskData() {
             maskData = new Uint8Array(width * height);
             maskData.fill(0); // Start empty
+            maskHistory = []; // Reset history on new image
         }
 
         function renderMaskOverlay() {
@@ -628,6 +671,7 @@
         canvasWrapper.addEventListener('mousedown', (e) => {
             if (isArtistMode && width > 0) {
                 isDrawing = true;
+                saveMaskHistory(); // Save before stroke
                 const coords = getCanvasCoords(e);
                 drawStartPos = coords;
                 
@@ -844,7 +888,28 @@
             options.forEach(opt => { const el = document.createElement('option'); el.value = opt.val; el.textContent = opt.text; gravityInput.appendChild(el); });
         }
         updateGravityOptions();
-        sortModeInput.addEventListener('change', updateGravityOptions);
+        
+        // Settings Change Listeners
+        sortModeInput.addEventListener('change', () => { updateGravityOptions(); handleSettingChange(); });
+        gravityInput.addEventListener('change', handleSettingChange);
+        colorModeInput.addEventListener('change', handleSettingChange);
+
+        function handleSettingChange() {
+             // Only auto-update if we have an image and aren't currently sorting
+             if (width > 0 && !isSorting) {
+                 setAsInput(true); // silent true
+             }
+        }
+        
+        // Defaults Button
+        btnDefaults.addEventListener('click', () => {
+             artistToggle.checked = false;
+             artistToggle.dispatchEvent(new Event('change'));
+             colorModeInput.value = 'cielab';
+             sortModeInput.value = 'xy';
+             updateGravityOptions();
+             handleSettingChange();
+        });
 
         dropZone.addEventListener('click', () => fileInput.click());
         dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('bg-gray-100'); });
@@ -862,7 +927,7 @@
         btnSort.addEventListener('click', () => startSortingProcess(false));
         btnRecord.addEventListener('click', () => startSortingProcess(true));
         btnReset.addEventListener('click', () => { if (isSorting && currentRunIsRecording) confirmResetDialog.classList.remove('hidden'); else resetCanvasState(); });
-        btnUseInput.addEventListener('click', setAsInput);
+        btnUseInput.addEventListener('click', () => setAsInput(false));
         btnConfirmReset.addEventListener('click', () => { confirmResetDialog.classList.add('hidden'); resetCanvasState(); });
         btnCancelReset.addEventListener('click', () => confirmResetDialog.classList.add('hidden'));
         
@@ -901,7 +966,7 @@
         }
 
         // --- CANVAS OPS ---
-        function setAsInput() {
+        function setAsInput(silent = false) {
             if (!width || !height) return;
             const dataURL = canvas.toDataURL();
             if (isSorting) {
@@ -913,8 +978,10 @@
             newImg.onload = () => {
                 originalImage = newImg;
                 resetCanvasState();
-                statusText.textContent = "IMAGE UPDATED"; statusText.classList.add('bg-blue-600', 'text-white');
-                setTimeout(() => { if (!isSorting) { statusText.textContent = "READY"; statusText.classList.remove('bg-blue-600'); } }, 1500);
+                if (!silent) {
+                    statusText.textContent = "IMAGE UPDATED"; statusText.classList.add('bg-blue-600', 'text-white');
+                    setTimeout(() => { if (!isSorting) { statusText.textContent = "READY"; statusText.classList.remove('bg-blue-600'); } }, 1500);
+                }
             };
             newImg.src = dataURL;
         }
