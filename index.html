@@ -23,7 +23,7 @@
 
     <!-- Header -->
     <header class="flex justify-between items-center px-6 py-4 border-b-2 border-black">
-        <h1 class="text-xl font-bold tracking-tighter uppercase">Pixel Sorter <span class="text-xs font-normal opacity-50 ml-2">v2.3 Hi-Res</span></h1>
+        <h1 class="text-xl font-bold tracking-tighter uppercase">Pixel Sorter <span class="text-xs font-normal opacity-50 ml-2">v2.4 Smart-Res</span></h1>
         <div class="text-xs" id="status-text">WAITING FOR IMAGE</div>
     </header>
 
@@ -37,9 +37,38 @@
             <input type="file" id="file-input" class="hidden" accept="image/*">
         </div>
 
+        <!-- Resize Dialog (Hidden by default) -->
+        <div id="resize-dialog" class="absolute inset-0 bg-white/90 z-20 hidden flex flex-col items-center justify-center p-8 text-center backdrop-blur-sm transition-opacity">
+            <div class="max-w-lg w-full border-2 border-black bg-white p-8 shadow-2xl">
+                <h2 class="text-2xl font-bold mb-4 uppercase tracking-tighter">Large Image Detected</h2>
+                <div class="grid grid-cols-2 gap-4 text-sm mb-6 border-y border-gray-200 py-4">
+                    <div class="text-right pr-4 border-r border-gray-200">
+                        <div class="text-gray-400 text-xs uppercase">Original</div>
+                        <div id="dialog-img-dims" class="font-bold text-lg"></div>
+                    </div>
+                    <div class="text-left pl-4">
+                        <div class="text-gray-400 text-xs uppercase">Your Screen</div>
+                        <div id="dialog-screen-dims" class="font-bold text-lg"></div>
+                    </div>
+                </div>
+                <p class="mb-8 text-gray-600 text-sm">
+                    This image is larger than your workspace. Scaling it down will significantly improve sorting speed and frame rate.
+                </p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <button id="btn-resize-fit" class="px-6 py-3 bg-black text-white font-bold uppercase hover:bg-gray-800 transition-colors flex-1">
+                        Scale to Screen
+                    </button>
+                    <button id="btn-keep-orig" class="px-6 py-3 border-2 border-black font-bold uppercase hover:bg-gray-100 transition-colors flex-1">
+                        Keep Original
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Canvas Container -->
-        <div class="relative shadow-2xl border-4 border-black hidden" id="canvas-wrapper">
-            <canvas id="canvas" title="Click to load a new image"></canvas>
+        <!-- Added max-w/max-h classes to ensure large images don't break layout visually -->
+        <div class="relative shadow-2xl border-4 border-black hidden max-w-full max-h-full flex flex-col" id="canvas-wrapper">
+            <canvas id="canvas" title="Click to load a new image" class="object-contain max-w-full max-h-full block"></canvas>
             <!-- Progress Overlay -->
             <div id="progress-bar-container" class="absolute bottom-0 left-0 h-1 bg-black w-0 transition-all duration-300"></div>
         </div>
@@ -86,12 +115,20 @@
         lucide.createIcons();
 
         // --- Core Elements ---
+        const mainContainer = document.getElementById('main-container');
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
         const canvas = document.getElementById('canvas');
         const canvasWrapper = document.getElementById('canvas-wrapper');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         
+        // Dialog Elements
+        const resizeDialog = document.getElementById('resize-dialog');
+        const dialogImgDims = document.getElementById('dialog-img-dims');
+        const dialogScreenDims = document.getElementById('dialog-screen-dims');
+        const btnResizeFit = document.getElementById('btn-resize-fit');
+        const btnKeepOrig = document.getElementById('btn-keep-orig');
+
         // Buttons
         const btnSort = document.getElementById('btn-sort');
         const btnRecord = document.getElementById('btn-record');
@@ -126,15 +163,32 @@
         dropZone.addEventListener('drop', handleDrop);
         fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
         
-        // Allow clicking canvas to upload new image instantly
         canvas.addEventListener('click', () => fileInput.click());
 
         btnSort.addEventListener('click', () => startSortingProcess(false));
         btnRecord.addEventListener('click', () => startSortingProcess(true));
         
-        btnReset.addEventListener('click', resetCanvas);
+        btnReset.addEventListener('click', () => {
+            // Reset using current image and last choice (defaulting to fit if logic complex, but here just re-trigger file logic or simple reset)
+            // For simplicity, reset reloads the original image and resets state, preserving last resolution choice isn't cached,
+            // so let's just re-draw the current canvas state or re-init.
+            // Actually, best to just stop animation and reset UI.
+            resetCanvasState(); 
+        });
+
         btnDownload.addEventListener('click', downloadVideo);
         btnFullscreen.addEventListener('click', toggleFullscreen);
+
+        // Dialog Listeners
+        btnResizeFit.addEventListener('click', () => {
+            resizeDialog.classList.add('hidden');
+            initCanvas(originalImage, true); // true = resize to fit
+        });
+
+        btnKeepOrig.addEventListener('click', () => {
+            resizeDialog.classList.add('hidden');
+            initCanvas(originalImage, false); // false = keep original
+        });
 
         // --- File Handling ---
         function handleDrop(e) {
@@ -151,27 +205,44 @@
                 const img = new Image();
                 img.onload = () => {
                     originalImage = img;
-                    resetCanvas();
-                    dropZone.classList.add('hidden');
-                    canvasWrapper.classList.remove('hidden');
-                    btnSort.disabled = false;
-                    btnRecord.disabled = false;
-                    btnReset.disabled = false;
-                    statusText.textContent = "READY TO SORT";
+                    checkDimensionsAndInit(img);
                 };
                 img.src = e.target.result;
             };
             reader.readAsDataURL(file);
         }
 
-        // --- Canvas Setup & Helpers ---
-        function resetCanvas() {
-            if (!originalImage) return;
+        function checkDimensionsAndInit(img) {
+            // Get available space (subtract padding)
+            const pad = 40;
+            const availW = mainContainer.clientWidth - pad;
+            const availH = mainContainer.clientHeight - pad;
 
-            // Stop any running process
+            const imgW = img.width;
+            const imgH = img.height;
+
+            // If image is significantly larger than screen (e.g., 20% larger), prompt user
+            if (imgW > availW * 1.2 || imgH > availH * 1.2) {
+                // Populate dialog
+                dialogImgDims.textContent = `${imgW} x ${imgH}`;
+                dialogScreenDims.textContent = `${availW} x ${availH}`;
+                
+                // Show dialog
+                resizeDialog.classList.remove('hidden');
+                dropZone.classList.add('hidden'); // Hide dropzone to prevent clutter
+            } else {
+                // Fits fine, just init
+                dropZone.classList.add('hidden');
+                initCanvas(img, false); // No scaling needed
+            }
+        }
+
+        // --- Canvas Setup & Helpers ---
+        
+        // Separate function to stop animation/recording only
+        function resetCanvasState() {
             if (animationId) cancelAnimationFrame(animationId);
             if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                // Important: nullify onstop so the old recording doesn't overwrite our status
                 mediaRecorder.onstop = null;
                 mediaRecorder.stop();
             }
@@ -180,38 +251,86 @@
             // Clean up old video
             if (videoURL) URL.revokeObjectURL(videoURL);
             btnDownload.disabled = true;
-
-            // Resize Canvas (Allow up to 4K now)
-            const maxDim = 3840; // 4K Resolution support
-            let w = originalImage.width;
-            let h = originalImage.height;
             
-            if (w > maxDim || h > maxDim) {
-                const ratio = Math.min(maxDim / w, maxDim / h);
-                w = Math.round(w * ratio);
-                h = Math.round(h * ratio);
-            }
-
-            canvas.width = w;
-            canvas.height = h;
-            width = w;
-            height = h;
-
-            // Draw original
-            ctx.drawImage(originalImage, 0, 0, w, h);
+            // Re-enable start buttons
+            btnSort.disabled = false;
+            btnRecord.disabled = false;
             
-            // Initial Data Extraction
-            const imageData = ctx.getImageData(0, 0, w, h);
-            pixelData = imageData.data; // Reference to the underlying buffer
-            
-            resDisplay.textContent = `${w} x ${h}`;
             progressBar.style.width = '0%';
             progressBar.classList.remove('bg-green-500');
             statusText.textContent = "READY";
             
-            // Reset buttons
+            // Re-draw initial state
+            if (pixelData && width && height) {
+                const tmpCanvas = document.createElement('canvas');
+                tmpCanvas.width = width;
+                tmpCanvas.height = height;
+                const tmpCtx = tmpCanvas.getContext('2d');
+                const imgData = new ImageData(pixelData, width, height);
+                tmpCtx.putImageData(imgData, 0, 0);
+                
+                // Restore to main canvas
+                // Actually, we usually want to reset to the UNSORTED image.
+                // Since 'originalImage' is stored, let's re-draw that based on current width/height.
+                ctx.drawImage(originalImage, 0, 0, width, height);
+                const newData = ctx.getImageData(0, 0, width, height);
+                pixelData = newData.data; // Reset pixel buffer to original
+            }
+        }
+
+        function initCanvas(img, resizeToFit) {
+            // 1. Reset state
+            if (animationId) cancelAnimationFrame(animationId);
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.onstop = null;
+                mediaRecorder.stop();
+            }
+            if (videoURL) URL.revokeObjectURL(videoURL);
+            
+            // 2. Calculate Dimensions
+            let w = img.width;
+            let h = img.height;
+            const maxDim = 3840; // 4K cap
+
+            if (resizeToFit) {
+                const pad = 40;
+                const availW = mainContainer.clientWidth - pad;
+                const availH = mainContainer.clientHeight - pad;
+                const ratio = Math.min(availW / w, availH / h);
+                w = Math.round(w * ratio);
+                h = Math.round(h * ratio);
+            } else {
+                // Even if keeping original, respect 4K limit to prevent crash
+                if (w > maxDim || h > maxDim) {
+                    const ratio = Math.min(maxDim / w, maxDim / h);
+                    w = Math.round(w * ratio);
+                    h = Math.round(h * ratio);
+                }
+            }
+
+            // 3. Apply to Canvas
+            canvas.width = w;
+            canvas.height = h;
+            width = w;
+            height = h;
+            
+            ctx.drawImage(img, 0, 0, w, h);
+            
+            // 4. Data Extraction
+            const imageData = ctx.getImageData(0, 0, w, h);
+            pixelData = imageData.data;
+
+            // 5. UI Updates
+            canvasWrapper.classList.remove('hidden');
+            resDisplay.textContent = `${w} x ${h}`;
+            statusText.textContent = "READY";
+            progressBar.style.width = '0%';
+            progressBar.classList.remove('bg-green-500');
+            
             btnSort.disabled = false;
             btnRecord.disabled = false;
+            btnReset.disabled = false;
+            btnDownload.disabled = true;
         }
 
         // --- Physics Engine (The Smart Logic) ---
