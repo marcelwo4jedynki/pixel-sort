@@ -29,15 +29,10 @@
         .canvas-fit {
             max-width: 100%;
             max-height: 100%;
-            /* Removed object-fit: contain to fix coordinate mapping bugs.
-               Flexbox in the parent will handle centering and aspect ratio
-               by shrinking the element itself. */
+            object-fit: contain;
         }
 
-        /* FIX: Center the mask canvas when in fit mode. 
-           The main canvas is centered by the parent's flexbox.
-           Since the mask is absolute, we must manually center it to match.
-        */
+        /* FIX: Center the mask canvas when in fit mode. */
         #mask-canvas.canvas-fit {
             left: 50%;
             top: 50%;
@@ -48,67 +43,66 @@
         .canvas-1to1 {
             max-width: none;
             max-height: none;
-            position: absolute; /* Allows translation relative to wrapper */
+            position: absolute;
             top: 0;
             left: 0;
-            /* Transform is handled via JS inline styles */
         }
 
         /* Help Popover Animations */
         .help-popover {
             transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s;
             opacity: 0;
-            visibility: hidden; /* Use visibility to fully hide interaction when transparent */
+            visibility: hidden;
             transform: translateY(10px);
-            /* Delay hiding to create "semi-solid" lingering feel */
             transition-delay: 0.1s; 
         }
         .help-popover.active {
             opacity: 1;
             visibility: visible;
             transform: translateY(0);
-            transition-delay: 0s; /* Instant appearance */
+            transition-delay: 0s;
         }
 
-        /* Prevent touch scrolling on canvas area */
+        /* Prevent touch scrolling on canvas area itself */
         #canvas-wrapper {
             touch-action: none;
         }
     </style>
 </head>
-<body class="bg-white text-black font-mono antialiased flex flex-col h-screen overflow-hidden selection:bg-black selection:text-white">
+<!-- Changed h-screen to h-[100dvh] and overflow-hidden to overflow-y-auto to allow scrolling on small screens -->
+<body class="bg-white text-black font-mono antialiased flex flex-col h-[100dvh] overflow-y-auto overflow-x-hidden selection:bg-black selection:text-white">
 
     <!-- Header & Stats Dashboard -->
-    <header class="border-b-2 border-black z-30 bg-white flex flex-col shrink-0">
+    <header class="border-b-2 border-black z-30 bg-white flex flex-col shrink-0 sticky top-0">
         <!-- Main Title Row -->
-        <div class="flex justify-between items-center px-4 sm:px-6 py-3 sm:py-4">
+        <div class="flex justify-between items-center px-2 sm:px-6 py-2 sm:py-4">
             <div class="flex items-center gap-3 overflow-hidden">
-                <h1 class="text-lg sm:text-xl font-bold tracking-tighter uppercase truncate">Real Time Pixel Sorter <span class="hidden sm:inline text-xs font-normal opacity-50 ml-2">v3.8 Artist Mode</span></h1>
+                <h1 class="text-base sm:text-xl font-bold tracking-tighter uppercase truncate">Pixel Sorter <span class="hidden sm:inline text-xs font-normal opacity-50 ml-2">v3.9</span></h1>
                 <a href="https://github.com/marcelwo4jedynki/pixel-sort" target="_blank" class="text-gray-400 hover:text-black transition-colors shrink-0" title="View Source on GitHub">
                     <i data-lucide="github" class="w-5 h-5"></i>
                 </a>
             </div>
-            <div class="text-xs font-bold bg-black text-white px-2 py-1 uppercase tracking-wider transition-colors shrink-0" id="status-text">WAITING</div>
+            <div class="text-[10px] sm:text-xs font-bold bg-black text-white px-2 py-1 uppercase tracking-wider transition-colors shrink-0" id="status-text">WAITING</div>
         </div>
         
         <!-- Stats Bar (Always Visible) -->
-        <div class="flex flex-wrap border-t border-gray-200 bg-gray-50 px-4 sm:px-6 py-2 gap-x-6 gap-y-1 text-xs font-mono uppercase tracking-tight overflow-x-auto whitespace-nowrap">
-             <div class="flex gap-2 items-center">
+        <div class="flex flex-wrap border-t border-gray-200 bg-gray-50 px-2 sm:px-6 py-1 gap-x-4 gap-y-1 text-[10px] sm:text-xs font-mono uppercase tracking-tight overflow-x-auto whitespace-nowrap">
+             <div class="flex gap-1 items-center">
                 <i data-lucide="timer" class="w-3 h-3 text-gray-400"></i>
                 <span class="text-gray-400">Time:</span>
                 <span id="stat-time" class="font-bold">--</span>
              </div>
-             <div class="flex gap-2 items-center">
+             <div class="flex gap-1 items-center">
                 <i data-lucide="layers" class="w-3 h-3 text-gray-400"></i>
                 <span class="text-gray-400">Frames:</span>
                 <span id="stat-frames" class="font-bold">--</span>
              </div>
-             <div class="flex gap-2 items-center">
+             <div class="flex gap-1 items-center hidden sm:flex">
                 <i data-lucide="cpu" class="w-3 h-3 text-gray-400"></i>
                 <span class="text-gray-400">Render:</span>
                 <span id="stat-render" class="font-bold">--</span>
              </div>
-             <div class="flex gap-2 items-center">
+             <div class="flex gap-1 items-center">
                 <i data-lucide="activity" class="w-3 h-3 text-gray-400"></i>
                 <span class="text-gray-400">FPS:</span>
                 <span id="stat-fps" class="font-bold">--</span>
@@ -117,7 +111,8 @@
     </header>
 
     <!-- Main Workspace -->
-    <main class="flex-1 relative flex items-center justify-center bg-gray-50 overflow-hidden p-4" id="main-container">
+    <!-- Added min-h to ensure canvas area doesn't collapse, removed fixed resizing constraint to allow flex grow -->
+    <main class="flex-1 relative flex items-center justify-center bg-gray-50 p-2 min-h-[50vh]" id="main-container">
         
         <!-- Empty State / Drop Zone -->
         <div id="drop-zone" class="absolute inset-4 border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 hover:border-black hover:text-black transition-colors cursor-pointer z-10">
@@ -127,27 +122,24 @@
         </div>
 
         <!-- Resize Dialog (Hidden by default) -->
-        <div id="resize-dialog" class="absolute inset-0 bg-white/90 z-20 hidden flex flex-col items-center justify-center p-8 text-center backdrop-blur-sm transition-opacity">
-            <div class="max-w-lg w-full border-2 border-black bg-white p-6 sm:p-8 shadow-2xl">
-                <h2 class="text-xl sm:text-2xl font-bold mb-4 uppercase tracking-tighter">Large Image Detected</h2>
+        <div id="resize-dialog" class="absolute inset-0 bg-white/90 z-20 hidden flex flex-col items-center justify-center p-4 text-center backdrop-blur-sm transition-opacity">
+            <div class="max-w-lg w-full border-2 border-black bg-white p-6 shadow-2xl">
+                <h2 class="text-xl font-bold mb-4 uppercase tracking-tighter">Large Image</h2>
                 <div class="grid grid-cols-2 gap-4 text-sm mb-6 border-y border-gray-200 py-4">
                     <div class="text-right pr-4 border-r border-gray-200">
                         <div class="text-gray-400 text-xs uppercase">Original</div>
-                        <div id="dialog-img-dims" class="font-bold text-lg"></div>
+                        <div id="dialog-img-dims" class="font-bold"></div>
                     </div>
                     <div class="text-left pl-4">
                         <div class="text-gray-400 text-xs uppercase">Your Screen</div>
-                        <div id="dialog-screen-dims" class="font-bold text-lg"></div>
+                        <div id="dialog-screen-dims" class="font-bold"></div>
                     </div>
                 </div>
-                <p class="mb-8 text-gray-600 text-sm">
-                    This image is larger than your workspace. Scaling it down will significantly improve sorting speed.
-                </p>
-                <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                    <button id="btn-resize-fit" class="px-6 py-3 bg-black text-white font-bold uppercase hover:bg-gray-800 transition-colors flex-1">
+                <div class="flex flex-col gap-3 justify-center">
+                    <button id="btn-resize-fit" class="px-6 py-3 bg-black text-white font-bold uppercase hover:bg-gray-800 transition-colors w-full">
                         Scale to Screen
                     </button>
-                    <button id="btn-keep-orig" class="px-6 py-3 border-2 border-black font-bold uppercase hover:bg-gray-100 transition-colors flex-1">
+                    <button id="btn-keep-orig" class="px-6 py-3 border-2 border-black font-bold uppercase hover:bg-gray-100 transition-colors w-full">
                         Keep Original
                     </button>
                 </div>
@@ -161,12 +153,9 @@
                     <i data-lucide="alert-triangle" class="w-12 h-12"></i>
                 </div>
                 <h2 class="text-xl font-bold mb-2 uppercase tracking-tighter">Interrupt Recording?</h2>
-                <p class="mb-8 text-gray-600 text-sm">
-                    A recording is currently in progress. Resetting now will discard the video file.
-                </p>
-                <div class="flex gap-4 justify-center">
+                <div class="flex gap-4 justify-center mt-6">
                     <button id="btn-confirm-reset" class="px-6 py-2 bg-red-600 text-white font-bold uppercase hover:bg-red-700 transition-colors flex-1">
-                        Yes, Reset
+                        Yes
                     </button>
                     <button id="btn-cancel-reset" class="px-6 py-2 border-2 border-black font-bold uppercase hover:bg-gray-100 transition-colors flex-1">
                         Cancel
@@ -176,26 +165,25 @@
         </div>
 
         <!-- Render Complete / Download Dialog -->
-        <div id="download-dialog" class="absolute inset-0 bg-white/95 z-40 hidden flex flex-col items-center justify-center p-8 text-center backdrop-blur-md animate-in fade-in zoom-in-95 duration-200">
-            <div class="max-w-lg w-full border-4 border-black bg-white p-8 shadow-2xl relative">
+        <div id="download-dialog" class="absolute inset-0 bg-white/95 z-40 hidden flex flex-col items-center justify-center p-4 text-center backdrop-blur-md animate-in fade-in zoom-in-95 duration-200">
+            <div class="max-w-lg w-full border-4 border-black bg-white p-6 shadow-2xl relative">
                 <button id="btn-close-dl" class="absolute top-4 right-4 text-gray-400 hover:text-black transition-colors">
                     <i data-lucide="x" class="w-6 h-6"></i>
                 </button>
                 
-                <div class="flex justify-center mb-6 text-green-600">
-                    <i data-lucide="check-circle-2" class="w-16 h-16"></i>
+                <div class="flex justify-center mb-4 text-green-600">
+                    <i data-lucide="check-circle-2" class="w-12 h-12"></i>
                 </div>
                 
-                <h2 class="text-3xl font-black mb-2 uppercase tracking-tighter">Render Complete</h2>
-                <p class="mb-8 text-gray-600">Your pixel sort recording is ready.</p>
+                <h2 class="text-2xl font-black mb-2 uppercase tracking-tighter">Render Complete</h2>
                 
-                <div class="flex flex-col gap-4">
-                    <button id="btn-dl-video-main" class="w-full py-4 bg-black text-white text-lg font-bold uppercase hover:bg-gray-800 transition-colors flex items-center justify-center gap-3">
+                <div class="flex flex-col gap-3 mt-6">
+                    <button id="btn-dl-video-main" class="w-full py-4 bg-black text-white text-base font-bold uppercase hover:bg-gray-800 transition-colors flex items-center justify-center gap-3">
                         <i data-lucide="film" class="w-5 h-5"></i> Download Video
                     </button>
                     
                     <button id="btn-dl-image-main" class="w-full py-3 border-2 border-black text-black font-bold uppercase hover:bg-gray-100 transition-colors flex items-center justify-center gap-2">
-                        <i data-lucide="image" class="w-8 h-8"></i> Download Current Frame
+                        <i data-lucide="image" class="w-5 h-5"></i> Download Frame
                     </button>
                 </div>
                 
@@ -208,8 +196,7 @@
         </div>
 
         <!-- Canvas Container -->
-        <div class="relative shadow-2xl border-4 border-black hidden flex flex-col justify-center items-center overflow-hidden bg-gray-100 cursor-grab" 
-             style="width: 100%; height: 100%;" 
+        <div class="relative shadow-2xl border-4 border-black hidden flex flex-col justify-center items-center overflow-hidden bg-gray-100 cursor-grab w-full h-full" 
              id="canvas-wrapper">
             
             <canvas id="canvas" class="canvas-fit z-0" title="Click to load a new image (or Drag to Pan in 1:1)"></canvas>
@@ -221,18 +208,19 @@
     </main>
 
     <!-- Controls Footer -->
-    <footer class="border-t-2 border-black bg-white p-4 z-30 shrink-0 relative">
-        <div class="flex flex-col gap-4 max-w-7xl mx-auto">
+    <!-- Changed shrink-0 to allow it to exist in flow, and adjusted padding for mobile -->
+    <footer class="border-t-2 border-black bg-white p-2 z-30 relative shrink-0">
+        <div class="flex flex-col gap-2 max-w-7xl mx-auto">
             
             <!-- Top Row: Config -->
-            <div class="flex flex-wrap gap-4 items-center justify-center text-sm text-gray-500 pb-2 border-b border-gray-100 relative">
+            <div class="flex flex-wrap gap-2 items-center justify-center text-sm text-gray-500 pb-2 border-b border-gray-100 relative">
                 
-                <span id="resolution-display" class="font-mono text-xs hidden sm:inline">0 x 0</span>
+                <span id="resolution-display" class="font-mono text-[10px] hidden sm:inline">0 x 0</span>
                 <div class="h-4 w-px bg-gray-300 hidden sm:block"></div>
                 
-                <button id="btn-zoom-toggle" class="flex items-center gap-2 hover:text-black transition-colors" title="Toggle 1:1 View">
+                <button id="btn-zoom-toggle" class="flex items-center gap-1 hover:text-black transition-colors" title="Toggle 1:1 View">
                     <i data-lucide="zoom-in" class="w-4 h-4"></i>
-                    <span id="zoom-label" class="text-xs uppercase font-bold">Fit</span>
+                    <span id="zoom-label" class="text-[10px] uppercase font-bold">Fit</span>
                 </button>
                 
                 <div class="h-4 w-px bg-gray-300 hidden sm:block"></div>
@@ -241,208 +229,145 @@
                 <label class="flex items-center gap-2 cursor-pointer hover:text-black select-none group">
                     <div class="relative">
                         <input type="checkbox" id="artist-mode-toggle" class="peer sr-only">
-                        <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-black rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-black"></div>
+                        <div class="w-7 h-4 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-black rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-black"></div>
                     </div>
-                    <span class="text-xs uppercase font-bold group-hover:text-black">Artist Mode</span>
+                    <span class="text-[10px] uppercase font-bold group-hover:text-black">Artist</span>
                 </label>
 
                 <div class="h-4 w-px bg-gray-300 hidden sm:block"></div>
 
                 <!-- Controls Group with Titles & Help -->
-                <div class="flex flex-wrap gap-4 justify-center items-end">
+                <div class="flex flex-wrap gap-2 justify-center items-end">
                     
                     <!-- Color Space Select -->
-                    <div class="flex flex-col gap-1 relative group">
-                        <div class="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase cursor-help select-none help-trigger" data-target="help-colorspace">
-                            Color Space <i data-lucide="help-circle" class="w-3 h-3"></i>
-                        </div>
-                        <select id="color-mode" class="bg-gray-50 border border-gray-200 rounded px-1 py-1 font-bold uppercase text-xs cursor-pointer outline-none hover:border-black transition-colors min-w-[100px]">
-                            <option value="cielab" selected>CIELAB (L*)</option>
-                            <option value="smart">Smart (HSV+)</option>
-                            <option value="luma">Luma (709)</option>
-                            <option value="classic">Classic (8b)</option>
-                            <option value="sat">Saturation</option>
-                            <option value="red">Red Ch.</option>
-                            <option value="green">Green Ch.</option>
-                            <option value="blue">Blue Ch.</option>
+                    <div class="flex flex-col gap-0.5 relative group">
+                        <select id="color-mode" class="bg-gray-50 border border-gray-200 rounded px-1 py-1 font-bold uppercase text-[10px] cursor-pointer outline-none hover:border-black transition-colors max-w-[80px]">
+                            <option value="cielab" selected>CIELAB</option>
+                            <option value="smart">Smart</option>
+                            <option value="luma">Luma</option>
+                            <option value="classic">Classic</option>
+                            <option value="sat">Sat</option>
+                            <option value="red">Red</option>
+                            <option value="green">Green</option>
+                            <option value="blue">Blue</option>
                         </select>
+                         <!-- Helper Trigger (Icon Only on Mobile) -->
+                         <div class="absolute -top-3 right-0 help-trigger cursor-help" data-target="help-colorspace">
+                             <i data-lucide="help-circle" class="w-2.5 h-2.5 text-gray-300 hover:text-black"></i>
+                         </div>
+
                         <!-- Popover -->
-                <div id="help-colorspace" class="help-popover absolute bottom-full left-0 mb-2 w-80 bg-white border-2 border-black shadow-xl p-4 z-50 text-xs text-left max-h-[80vh] overflow-y-auto">
-                            <h4 class="font-bold uppercase border-b border-gray-200 pb-1 mb-2">About Color Spaces</h4>
-                            <p class="text-gray-600 mb-3 leading-relaxed">
-                                A color space determines how pixels are weighted. We calculate a numerical value for every color and then sort them. The previews below show 4,096 uniformly distributed colors sorted by each algorithm, revealing the gradient curve created by that math.
-                            </p>
-                            
-                            <div class="space-y-4">
-                                <!-- CIELAB -->
-                                <div class="flex gap-3 items-start">
-                                    <canvas data-mode="cielab" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
-                                    <div>
-                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">CIELAB (L*)</strong>
-                                        <span class="text-gray-500 leading-tight block">Perceptually accurate lightness (how the human eye sees brightness). Very smooth.</span>
-                                    </div>
-                                </div>
-                                <!-- Smart -->
-                                <div class="flex gap-3 items-start">
-                                    <canvas data-mode="smart" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
-                                    <div>
-                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">Smart (HSV+)</strong>
-                                        <span class="text-gray-500 leading-tight block">Sorts by Brightness, but uses Hue to break ties. Creates complex, glitchy gradients.</span>
-                                    </div>
-                                </div>
-                                <!-- Luma -->
-                                <div class="flex gap-3 items-start">
-                                    <canvas data-mode="luma" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
-                                    <div>
-                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">Luma (Rec. 709)</strong>
-                                        <span class="text-gray-500 leading-tight block">Standard video grayscale brightness. Accurate but technical.</span>
-                                    </div>
-                                </div>
-                                <!-- Classic -->
-                                <div class="flex gap-3 items-start">
-                                    <canvas data-mode="classic" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
-                                    <div>
-                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">Classic (8-bit)</strong>
-                                        <span class="text-gray-500 leading-tight block">Rounds values to step intervals. Creates sediment-like layers and banding.</span>
-                                    </div>
-                                </div>
-                                <!-- Saturation -->
-                                <div class="flex gap-3 items-start">
-                                    <canvas data-mode="sat" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
-                                    <div>
-                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">Saturation</strong>
-                                        <span class="text-gray-500 leading-tight block">Sorts from grayscale (low) to vivid neon colors (high).</span>
-                                    </div>
-                                </div>
-                                <!-- Red -->
-                                <div class="flex gap-3 items-start">
-                                    <canvas data-mode="red" class="preview-canvas w-16 h-16 border border-gray-300 bg-gray-100 shrink-0 image-render-pixel"></canvas>
-                                    <div>
-                                        <strong class="block uppercase text-[10px] tracking-wide mb-1">Red Channel</strong>
-                                        <span class="text-gray-500 leading-tight block">Sorts based purely on how much Red is in the pixel.</span>
-                                    </div>
-                                </div>
+                        <div id="help-colorspace" class="help-popover absolute bottom-full left-0 mb-2 w-72 bg-white border-2 border-black shadow-xl p-3 z-50 text-xs text-left max-h-[60vh] overflow-y-auto">
+                            <h4 class="font-bold uppercase border-b border-gray-200 pb-1 mb-2">Color Space</h4>
+                            <div class="space-y-2">
+                                <div class="flex gap-2 items-center"><canvas data-mode="cielab" class="preview-canvas w-8 h-8 border bg-gray-100 shrink-0"></canvas><span>CIELAB (L*)</span></div>
+                                <div class="flex gap-2 items-center"><canvas data-mode="smart" class="preview-canvas w-8 h-8 border bg-gray-100 shrink-0"></canvas><span>Smart (HSV+)</span></div>
+                                <div class="flex gap-2 items-center"><canvas data-mode="luma" class="preview-canvas w-8 h-8 border bg-gray-100 shrink-0"></canvas><span>Luma (Rec709)</span></div>
+                                <div class="flex gap-2 items-center"><canvas data-mode="classic" class="preview-canvas w-8 h-8 border bg-gray-100 shrink-0"></canvas><span>Classic (8b)</span></div>
+                                <div class="flex gap-2 items-center"><canvas data-mode="sat" class="preview-canvas w-8 h-8 border bg-gray-100 shrink-0"></canvas><span>Saturation</span></div>
                             </div>
                         </div>
                     </div>
 
                     <!-- Axis Select -->
-                    <div class="flex flex-col gap-1 relative group">
-                        <div class="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase cursor-help select-none help-trigger" data-target="help-axis">
-                            Axis <i data-lucide="help-circle" class="w-3 h-3"></i>
-                        </div>
-                        <select id="sort-mode" class="bg-gray-50 border border-gray-200 rounded px-1 py-1 font-bold uppercase text-xs cursor-pointer outline-none hover:border-black transition-colors min-w-[80px]">
-                            <option value="xy">XY Mix</option>
-                            <option value="y">Y Only</option>
-                            <option value="x">X Only</option>
+                    <div class="flex flex-col gap-0.5 relative group">
+                        <select id="sort-mode" class="bg-gray-50 border border-gray-200 rounded px-1 py-1 font-bold uppercase text-[10px] cursor-pointer outline-none hover:border-black transition-colors max-w-[60px]">
+                            <option value="xy">XY</option>
+                            <option value="y">Y</option>
+                            <option value="x">X</option>
                         </select>
-                        <div id="help-axis" class="help-popover absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-white border-2 border-black shadow-xl p-3 z-50 text-xs text-left hidden">
-                            <h4 class="font-bold uppercase border-b border-gray-200 pb-1 mb-2">Sorting Axis</h4>
-                            <ul class="space-y-1 text-gray-600 list-disc pl-4">
-                                <li><strong>XY Mix:</strong> Fluid 2D movement.</li>
-                                <li><strong>Y Only:</strong> Sorts columns (Up/Down).</li>
-                                <li><strong>X Only:</strong> Sorts rows (Left/Right).</li>
-                            </ul>
-                        </div>
                     </div>
                     
                     <!-- Gravity Select -->
-                    <div class="flex flex-col gap-1 relative group">
-                        <div class="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase cursor-help select-none help-trigger" data-target="help-gravity">
-                            Gravity <i data-lucide="help-circle" class="w-3 h-3"></i>
-                        </div>
-                        <select id="gravity-direction" class="bg-gray-50 border border-gray-200 rounded px-1 py-1 font-bold uppercase text-xs cursor-pointer outline-none hover:border-black transition-colors min-w-[80px]">
+                    <div class="flex flex-col gap-0.5 relative group">
+                        <select id="gravity-direction" class="bg-gray-50 border border-gray-200 rounded px-1 py-1 font-bold uppercase text-[10px] cursor-pointer outline-none hover:border-black transition-colors max-w-[60px]">
                             <!-- Populated via JS -->
                         </select>
-                        <div id="help-gravity" class="help-popover absolute bottom-full right-0 mb-2 w-48 bg-white border-2 border-black shadow-xl p-3 z-50 text-xs text-left hidden">
-                            <h4 class="font-bold uppercase border-b border-gray-200 pb-1 mb-2">Gravity Direction</h4>
-                            <p class="text-gray-600">Determines where bright pixels fall.</p>
-                        </div>
                     </div>
 
                     <!-- DEFAULTS Button -->
-                     <button id="btn-defaults" class="ml-2 px-2 py-1 bg-gray-100 border border-gray-300 text-[10px] uppercase font-bold text-gray-400 hover:text-black hover:border-black transition-colors" title="Reset Settings & Disable Artist Mode">
-                        Default
+                     <button id="btn-defaults" class="ml-1 px-2 py-1 bg-gray-100 border border-gray-300 text-[10px] uppercase font-bold text-gray-400 hover:text-black hover:border-black transition-colors" title="Reset Settings">
+                        Def
                      </button>
                 </div>
             </div>
 
             <!-- Artist Mode Toolbar (Hidden by default) -->
-            <div id="artist-toolbar" class="hidden flex-wrap gap-4 items-center justify-center bg-gray-50 p-2 border border-gray-200 rounded-lg animate-in fade-in slide-in-from-top-2 duration-200">
-                <div class="flex items-center gap-2 border-r border-gray-300 pr-4 mr-2">
-                    <span class="text-[10px] font-bold uppercase text-gray-400">Tools</span>
+            <div id="artist-toolbar" class="hidden flex-wrap gap-2 items-center justify-center bg-gray-50 p-2 border border-gray-200 rounded-lg animate-in fade-in slide-in-from-top-2 duration-200">
+                <div class="flex items-center gap-1 border-r border-gray-300 pr-2 mr-1">
                     <!-- Tool: Brush -->
-                    <button class="tool-btn p-2 border border-transparent rounded hover:bg-white hover:border-gray-300 active:bg-gray-200 transition-all active-tool" data-tool="brush" title="Circle Brush">
+                    <button class="tool-btn p-1.5 border border-transparent rounded hover:bg-white hover:border-gray-300 active:bg-gray-200 transition-all active-tool" data-tool="brush" title="Circle Brush">
                         <i data-lucide="brush" class="w-4 h-4"></i>
                     </button>
                     <!-- Tool: Box -->
-                    <button class="tool-btn p-2 border border-transparent rounded hover:bg-white hover:border-gray-300 active:bg-gray-200 transition-all" data-tool="rect" title="Box Selection">
+                    <button class="tool-btn p-1.5 border border-transparent rounded hover:bg-white hover:border-gray-300 active:bg-gray-200 transition-all" data-tool="rect" title="Box Selection">
                         <i data-lucide="box-select" class="w-4 h-4"></i>
                     </button>
                     <!-- Tool: Col -->
-                    <button class="tool-btn p-2 border border-transparent rounded hover:bg-white hover:border-gray-300 active:bg-gray-200 transition-all" data-tool="col" title="Column Section">
+                    <button class="tool-btn p-1.5 border border-transparent rounded hover:bg-white hover:border-gray-300 active:bg-gray-200 transition-all" data-tool="col" title="Column Section">
                         <i data-lucide="columns" class="w-4 h-4"></i>
                     </button>
                     <!-- Tool: Row -->
-                    <button class="tool-btn p-2 border border-transparent rounded hover:bg-white hover:border-gray-300 active:bg-gray-200 transition-all" data-tool="row" title="Row Section">
+                    <button class="tool-btn p-1.5 border border-transparent rounded hover:bg-white hover:border-gray-300 active:bg-gray-200 transition-all" data-tool="row" title="Row Section">
                         <i data-lucide="rows" class="w-4 h-4"></i>
                     </button>
                 </div>
 
                 <!-- Brush Settings -->
-                <div class="flex items-center gap-3 border-r border-gray-300 pr-4 mr-2" id="brush-settings">
-                    <span class="text-[10px] font-bold uppercase text-gray-400">Size</span>
-                    <input type="range" id="brush-size" min="5" max="200" value="50" class="w-24 h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer">
+                <div class="flex items-center gap-1 border-r border-gray-300 pr-2 mr-1" id="brush-settings">
+                    <span class="text-[10px] font-bold uppercase text-gray-400">Sz</span>
+                    <input type="range" id="brush-size" min="5" max="200" value="50" class="w-16 h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer">
                 </div>
 
                 <!-- Mode Settings -->
-                <div class="flex items-center gap-2">
-                     <span class="text-[10px] font-bold uppercase text-gray-400">Action</span>
+                <div class="flex items-center gap-1">
                      <div class="flex bg-white border border-gray-200 rounded overflow-hidden">
-                        <button class="draw-mode-btn px-3 py-1 text-xs font-bold uppercase hover:bg-gray-50 active-mode bg-black text-white" data-mode="draw">Draw</button>
-                        <button class="draw-mode-btn px-3 py-1 text-xs font-bold uppercase hover:bg-gray-50" data-mode="erase">Erase</button>
+                        <button class="draw-mode-btn px-2 py-1 text-[10px] font-bold uppercase hover:bg-gray-50 active-mode bg-black text-white" data-mode="draw">Draw</button>
+                        <button class="draw-mode-btn px-2 py-1 text-[10px] font-bold uppercase hover:bg-gray-50" data-mode="erase">Erase</button>
                      </div>
                 </div>
                  
                  <!-- Mask Actions -->
-                 <div class="flex items-center ml-2 gap-2 border-l border-gray-300 pl-4">
+                 <div class="flex items-center ml-1 gap-1 border-l border-gray-300 pl-2">
                      <!-- Undo -->
                      <button id="btn-undo-mask" class="p-1 hover:bg-white rounded hover:text-black text-gray-500 transition-colors" title="Undo Mask Change">
                         <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
                      </button>
                      <!-- Invert -->
-                     <button id="btn-invert-mask" class="text-[10px] font-bold uppercase text-black hover:text-gray-600 hover:underline">Invert</button>
+                     <button id="btn-invert-mask" class="text-[10px] font-bold uppercase text-black hover:text-gray-600 px-1">Inv</button>
                      <!-- Clear -->
-                     <button id="btn-clear-mask" class="text-[10px] font-bold uppercase text-red-500 hover:text-red-700 hover:underline">Clear</button>
+                     <button id="btn-clear-mask" class="text-[10px] font-bold uppercase text-red-500 hover:text-red-700 px-1">Clr</button>
                  </div>
             </div>
 
             <!-- Bottom Row: Buttons -->
-            <div class="flex flex-wrap gap-3 justify-center items-center">
-                <button id="btn-reset" class="px-4 py-2 border-2 border-black uppercase text-xs font-bold hover:bg-black hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled>
+            <div class="flex flex-wrap gap-2 justify-center items-center">
+                <button id="btn-reset" class="px-3 py-2 border-2 border-black uppercase text-[10px] sm:text-xs font-bold hover:bg-black hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled>
                     Reset
                 </button>
-                <button id="btn-use-input" class="px-4 py-2 border-2 border-black uppercase text-xs font-bold hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" title="Use result as input" disabled>
-                    Use as Input
-                </button>
                 
-                <div class="w-px bg-gray-300 mx-1 h-6 hidden sm:block"></div>
+                <div class="w-px bg-gray-300 mx-0.5 h-6 hidden sm:block"></div>
                 
-                <button id="btn-sort" class="flex-1 sm:flex-none px-6 py-2 border-2 border-black uppercase text-xs font-bold hover:bg-black hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled>
+                <!-- Main Actions: Flex Grow on Mobile to be big targets -->
+                <button id="btn-sort" class="flex-1 sm:flex-none px-4 py-2 border-2 border-black uppercase text-xs font-bold hover:bg-black hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed shrink-0" disabled>
                     Start
                 </button>
-                <button id="btn-record" class="flex-1 sm:flex-none px-6 py-2 border-2 border-black bg-black text-white uppercase text-xs font-bold hover:bg-white hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled>
+                <button id="btn-record" class="flex-1 sm:flex-none px-4 py-2 border-2 border-black bg-black text-white uppercase text-xs font-bold hover:bg-white hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed shrink-0" disabled>
                     Record
                 </button>
                 
                 <!-- Stop Button -->
-                <button id="btn-stop" class="px-4 py-2 border-2 border-black uppercase text-xs font-bold hover:bg-red-600 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed hidden">
+                <button id="btn-stop" class="flex-1 sm:flex-none px-4 py-2 border-2 border-black uppercase text-xs font-bold hover:bg-red-600 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed hidden shrink-0">
                     Stop
                 </button>
 
-                <div class="w-px bg-gray-300 mx-1 h-6 hidden sm:block"></div>
-
+                <div class="w-px bg-gray-300 mx-0.5 h-6 hidden sm:block"></div>
+                
+                <!-- Secondary Actions -->
                 <div class="flex gap-2">
+                     <button id="btn-use-input" class="p-2 border-2 border-black uppercase text-[10px] font-bold hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" title="Use result as input" disabled>
+                        <i data-lucide="arrow-up-circle" class="w-4 h-4"></i>
+                    </button>
                     <button id="btn-fullscreen" class="p-2 border-2 border-black hover:bg-black hover:text-white transition-colors" title="Maximize">
                         <i data-lucide="maximize" class="w-4 h-4"></i>
                     </button>
@@ -492,7 +417,7 @@
         // Buttons & Stats
         const btnSort = document.getElementById('btn-sort');
         const btnRecord = document.getElementById('btn-record');
-        const btnStop = document.getElementById('btn-stop'); // NEW STOP BUTTON
+        const btnStop = document.getElementById('btn-stop');
         const btnReset = document.getElementById('btn-reset');
         const btnUseInput = document.getElementById('btn-use-input');
         const btnDownload = document.getElementById('btn-download');
@@ -571,8 +496,6 @@
                 maskCanvas.classList.remove('hidden');
                 canvasWrapper.classList.add('cursor-crosshair');
                 canvasWrapper.classList.remove('cursor-grab');
-                
-                // Initialize mask if needed
                 if (!maskData && width > 0 && height > 0) {
                     initMaskData();
                     renderMaskOverlay();
@@ -586,7 +509,6 @@
             }
         });
 
-        // Tool Selection
         toolBtns.forEach(btn => {
             btn.addEventListener('click', () => {
                 toolBtns.forEach(b => {
@@ -599,7 +521,6 @@
             });
         });
 
-        // Draw/Erase Toggle
         drawModeBtns.forEach(btn => {
             btn.addEventListener('click', () => {
                 drawModeBtns.forEach(b => {
@@ -614,7 +535,7 @@
 
         function saveMaskHistory() {
              if (!maskData) return;
-             if (maskHistory.length > 20) maskHistory.shift(); // Limit stack
+             if (maskHistory.length > 20) maskHistory.shift(); 
              maskHistory.push(new Uint8Array(maskData));
         }
 
@@ -643,64 +564,48 @@
 
         function initMaskData() {
             maskData = new Uint8Array(width * height);
-            maskData.fill(0); // Start empty
-            maskHistory = []; // Reset history on new image
+            maskData.fill(0);
+            maskHistory = [];
         }
 
         function renderMaskOverlay() {
             if (!maskData || width === 0 || height === 0) return;
-            
-            // We draw the selection as Green.
-            // Clear
             maskCtx.clearRect(0, 0, width, height);
-            
             const imgData = maskCtx.createImageData(width, height);
             const data = imgData.data;
-            
             for (let i = 0; i < width * height; i++) {
                 if (maskData[i] === 1) {
                     const idx = i * 4;
-                    data[idx] = 0;     // R
-                    data[idx+1] = 255; // G (Green selection)
-                    data[idx+2] = 0;   // B
-                    data[idx+3] = 100; // Alpha
+                    data[idx] = 0; data[idx+1] = 255; data[idx+2] = 0; data[idx+3] = 100;
                 }
             }
             maskCtx.putImageData(imgData, 0, 0);
         }
 
-        // --- MOUSE & TOUCH INTERACTIONS (DRAWING VS PANNING) ---
-
-        // Helper to get coordinates relative to canvas
+        // --- MOUSE & TOUCH INTERACTIONS ---
         function getCanvasCoords(input) {
-            // 'input' can be mouse event or touch object, basically anything with clientX/Y
             const rect = canvas.getBoundingClientRect();
-            // Calculate scale in case of fit mode
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
-            
             return {
                 x: Math.floor((input.clientX - rect.left) * scaleX),
                 y: Math.floor((input.clientY - rect.top) * scaleY)
             };
         }
 
-        // --- MOUSE LISTENERS ---
+        // Mouse
         canvasWrapper.addEventListener('mousedown', (e) => {
             if (isArtistMode && width > 0) {
                 isDrawing = true;
-                saveMaskHistory(); // Save before stroke
+                saveMaskHistory();
                 const coords = getCanvasCoords(e);
                 drawStartPos = coords;
-                
                 if (currentTool !== 'brush') {
-                    // Save snapshot for shape preview
                     tempMaskSnapshot = new Uint8Array(maskData);
                 } else {
                     applyBrush(coords.x, coords.y);
                 }
             } else if (viewMode === '1to1') {
-                // Normal Panning Logic
                 isPanning = true;
                 wasPanning = false;
                 startPan.x = e.clientX - pan.x;
@@ -713,11 +618,9 @@
         window.addEventListener('mousemove', (e) => {
             if (isArtistMode && isDrawing && width > 0) {
                 const coords = getCanvasCoords(e);
-                
                 if (currentTool === 'brush') {
                     applyBrush(coords.x, coords.y);
                 } else {
-                    // Shape Preview
                     previewShape(coords.x, coords.y);
                 }
             } else if (isPanning && viewMode === '1to1') {
@@ -744,17 +647,15 @@
             }
         });
 
-        // --- TOUCH LISTENERS (MOBILE SUPPORT) ---
+        // Touch
         canvasWrapper.addEventListener('touchstart', (e) => {
-            if(e.cancelable) e.preventDefault(); // Stop scrolling while using canvas
+            if(e.cancelable) e.preventDefault();
             const touch = e.touches[0];
-            
             if (isArtistMode && width > 0) {
                 isDrawing = true;
                 saveMaskHistory(); 
                 const coords = getCanvasCoords(touch);
                 drawStartPos = coords;
-                
                 if (currentTool !== 'brush') {
                     tempMaskSnapshot = new Uint8Array(maskData);
                 } else {
@@ -772,7 +673,6 @@
             if (!isDrawing && !isPanning) return;
             if(e.cancelable) e.preventDefault();
             const touch = e.touches[0];
-            
             if (isArtistMode && isDrawing && width > 0) {
                 const coords = getCanvasCoords(touch);
                 if (currentTool === 'brush') {
@@ -791,7 +691,6 @@
         window.addEventListener('touchend', (e) => {
             if (isArtistMode && isDrawing) {
                 isDrawing = false;
-                // For touchend, use changedTouches to find where finger lifted
                 const touch = e.changedTouches[0];
                 const coords = getCanvasCoords(touch);
                 if (currentTool !== 'brush') {
@@ -801,25 +700,18 @@
             }
             if (isPanning) {
                 isPanning = false;
-                // Cursor classes not needed for touch
             }
         });
-
-
-        // --- DRAWING LOGIC ---
 
         function applyBrush(cx, cy) {
             const size = parseInt(brushSizeInput.value);
             const r = size / 2;
             const rSq = r * r;
             const val = drawMode === 'draw' ? 1 : 0;
-            
-            // Bounding box to optimize loop
             const minX = Math.max(0, Math.floor(cx - r));
             const maxX = Math.min(width, Math.ceil(cx + r));
             const minY = Math.max(0, Math.floor(cy - r));
             const maxY = Math.min(height, Math.ceil(cy + r));
-            
             let changed = false;
             for (let y = minY; y < maxY; y++) {
                 for (let x = minX; x < maxX; x++) {
@@ -838,50 +730,32 @@
         }
 
         function previewShape(cx, cy) {
-            // Restore snapshot first
             maskData.set(tempMaskSnapshot);
-            
             const sx = drawStartPos.x;
             const sy = drawStartPos.y;
             const val = drawMode === 'draw' ? 1 : 0;
-            
             fillShape(sx, sy, cx, cy, val);
             renderMaskOverlay();
         }
 
         function applyShape(cx, cy) {
-            // Finalize shape
             renderMaskOverlay();
         }
 
         function fillShape(x1, y1, x2, y2, val) {
             let minX, maxX, minY, maxY;
-            
             if (currentTool === 'rect') {
-                minX = Math.min(x1, x2);
-                maxX = Math.max(x1, x2);
-                minY = Math.min(y1, y2);
-                maxY = Math.max(y1, y2);
+                minX = Math.min(x1, x2); maxX = Math.max(x1, x2);
+                minY = Math.min(y1, y2); maxY = Math.max(y1, y2);
             } else if (currentTool === 'col') {
-                // Vertical Strip: Width is defined by drag, Height is FULL
-                minX = Math.min(x1, x2);
-                maxX = Math.max(x1, x2);
-                minY = 0;
-                maxY = height;
+                minX = Math.min(x1, x2); maxX = Math.max(x1, x2);
+                minY = 0; maxY = height;
             } else if (currentTool === 'row') {
-                // Horizontal Strip: Height is defined by drag, Width is FULL
-                minX = 0;
-                maxX = width;
-                minY = Math.min(y1, y2);
-                maxY = Math.max(y1, y2);
+                minX = 0; maxX = width;
+                minY = Math.min(y1, y2); maxY = Math.max(y1, y2);
             }
-
-            // Clamp
-            minX = Math.max(0, minX);
-            maxX = Math.min(width, maxX);
-            minY = Math.max(0, minY);
-            maxY = Math.min(height, maxY);
-
+            minX = Math.max(0, minX); maxX = Math.min(width, maxX);
+            minY = Math.max(0, minY); maxY = Math.min(height, maxY);
             for (let y = minY; y < maxY; y++) {
                 const rowOffset = y * width;
                 for (let x = minX; x < maxX; x++) {
@@ -890,8 +764,7 @@
             }
         }
 
-
-        // --- HELP SYSTEM (EXISTING) ---
+        // --- HELP SYSTEM ---
         const helpTriggers = document.querySelectorAll('.help-trigger');
         let activePopover = null;
 
@@ -969,19 +842,16 @@
         }
         updateGravityOptions();
         
-        // Settings Change Listeners
         sortModeInput.addEventListener('change', () => { updateGravityOptions(); handleSettingChange(); });
         gravityInput.addEventListener('change', handleSettingChange);
         colorModeInput.addEventListener('change', handleSettingChange);
 
         function handleSettingChange() {
-             // Only auto-update if we have an image and aren't currently sorting
              if (width > 0 && !isSorting) {
-                 setAsInput(true); // silent true
+                 setAsInput(true); 
              }
         }
         
-        // Defaults Button
         btnDefaults.addEventListener('click', () => {
              artistToggle.checked = false;
              artistToggle.dispatchEvent(new Event('change'));
@@ -1000,32 +870,25 @@
         btnZoomToggle.addEventListener('click', toggleZoomMode);
         canvasWrapper.addEventListener('click', (e) => {
             if (viewMode === '1to1' && wasPanning) { wasPanning = false; return; }
-            if (isSorting || isArtistMode) return; // Disable upload click in artist mode
+            if (isSorting || isArtistMode) return; 
             fileInput.click();
         });
 
         btnSort.addEventListener('click', () => startSortingProcess(false));
         btnRecord.addEventListener('click', () => startSortingProcess(true));
         
-        // Stop Button Logic
         btnStop.addEventListener('click', () => {
              if (isSorting) {
                  isSorting = false;
-                 // Stop logic is effectively handled by step() checking isSorting
-                 // But we should also re-enable UI immediately
                  statusText.textContent = "STOPPED";
                  statusText.classList.add('bg-red-600', 'text-white');
                  setTimeout(() => { if (!isSorting) statusText.classList.remove('bg-red-600'); }, 1500);
-                 
                  btnStop.disabled = true;
                  btnStop.classList.add('hidden');
-                 
                  btnReset.disabled = false;
                  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
                      mediaRecorder.stop();
                  }
-                 
-                 // Restore Mask Visibility if needed
                  maskCanvas.style.opacity = '';
              }
         });
@@ -1035,7 +898,6 @@
         btnConfirmReset.addEventListener('click', () => { confirmResetDialog.classList.add('hidden'); resetCanvasState(); });
         btnCancelReset.addEventListener('click', () => confirmResetDialog.classList.add('hidden'));
         
-        // Updated Download Logic
         btnDownload.addEventListener('click', downloadImage);
         btnDlVideoMain.addEventListener('click', downloadVideo);
         btnDlImageMain.addEventListener('click', downloadImage);
@@ -1062,8 +924,10 @@
             reader.readAsDataURL(file);
         }
         function checkDimensionsAndInit(img) {
-            const pad = 40, availW = mainContainer.clientWidth - pad, availH = mainContainer.clientHeight - pad;
-            if (img.width > availW * 1.2 || img.height > availH * 1.2) {
+            const pad = 20; // Reduced padding
+            const availW = mainContainer.clientWidth - pad;
+            const availH = mainContainer.clientHeight - pad;
+            if (img.width > availW * 1.5 || img.height > availH * 1.5) {
                 dialogImgDims.textContent = `${img.width} x ${img.height}`; dialogScreenDims.textContent = `${availW} x ${availH}`;
                 resizeDialog.classList.remove('hidden'); dropZone.classList.add('hidden');
             } else { dropZone.classList.add('hidden'); initCanvas(img, false); }
@@ -1083,7 +947,7 @@
                 originalImage = newImg;
                 resetCanvasState();
                 if (!silent) {
-                    statusText.textContent = "IMAGE UPDATED"; statusText.classList.add('bg-blue-600', 'text-white');
+                    statusText.textContent = "UPDATED"; statusText.classList.add('bg-blue-600', 'text-white');
                     setTimeout(() => { if (!isSorting) { statusText.textContent = "READY"; statusText.classList.remove('bg-blue-600'); } }, 1500);
                 }
             };
@@ -1093,7 +957,7 @@
         function toggleZoomMode() {
             if (!width || !height) return;
             if (viewMode === 'fit') {
-                viewMode = '1to1'; zoomLabel.textContent = "1:1 View";
+                viewMode = '1to1'; zoomLabel.textContent = "1:1";
                 canvas.classList.remove('canvas-fit'); canvas.classList.add('canvas-1to1');
                 maskCanvas.classList.remove('canvas-fit'); maskCanvas.classList.add('canvas-1to1');
                 if(!isArtistMode) {
@@ -1124,22 +988,11 @@
             isSorting = false; currentRunIsRecording = false;
             if (videoURL) URL.revokeObjectURL(videoURL);
             downloadDialog.classList.add('hidden');
-            
-            // UI Reset
-            btnSort.disabled = false; 
-            btnRecord.disabled = false; 
-            btnUseInput.disabled = false;
-            
-            // Hide Stop Button
-            btnStop.disabled = true;
-            btnStop.classList.add('hidden');
-            
-            // Reset Mask Opacity
+            btnSort.disabled = false; btnRecord.disabled = false; btnUseInput.disabled = false;
+            btnStop.disabled = true; btnStop.classList.add('hidden');
             maskCanvas.style.opacity = '';
-            
             progressBar.style.width = '0%'; progressBar.classList.remove('bg-green-500'); statusText.textContent = "READY";
             statTime.textContent = "--"; statFrames.textContent = "--"; statRender.textContent = "--"; statFps.textContent = "--";
-            
             if (width && height && originalImage) {
                 ctx.drawImage(originalImage, 0, 0, width, height);
                 pixelData = ctx.getImageData(0, 0, width, height).data;
@@ -1151,7 +1004,9 @@
             resetCanvasState();
             let w = img.width, h = img.height; const maxDim = 3840;
             if (resizeToFit) {
-                const pad = 40, availW = mainContainer.clientWidth - pad, availH = mainContainer.clientHeight - pad;
+                const pad = 20; 
+                const availW = mainContainer.clientWidth - pad; 
+                const availH = mainContainer.clientHeight - pad;
                 const ratio = Math.min(availW / w, availH / h); w = Math.round(w * ratio); h = Math.round(h * ratio);
             } else {
                 if (w > maxDim || h > maxDim) { const ratio = Math.min(maxDim / w, maxDim / h); w = Math.round(w * ratio); h = Math.round(h * ratio); }
@@ -1159,18 +1014,14 @@
             canvas.width = w; canvas.height = h;
             maskCanvas.width = w; maskCanvas.height = h;
             width = w; height = h;
-            
             ctx.drawImage(img, 0, 0, w, h);
             pixelData = ctx.getImageData(0, 0, w, h).data;
             initMaskData();
-            renderMaskOverlay(); // Clear any existing
-
+            renderMaskOverlay();
             canvasWrapper.classList.remove('hidden');
-            resDisplay.textContent = `${w} x ${h}`; statusText.textContent = "READY";
+            resDisplay.textContent = `${w}x${h}`; statusText.textContent = "READY";
             btnSort.disabled = false; btnRecord.disabled = false; btnReset.disabled = false; 
-            btnDownload.disabled = false; // Enable image download immediately
-            btnUseInput.disabled = false;
-            
+            btnDownload.disabled = false; btnUseInput.disabled = false;
             viewMode = 'fit'; zoomLabel.textContent = "Fit";
             canvas.classList.add('canvas-fit'); canvas.classList.remove('canvas-1to1');
             maskCanvas.classList.add('canvas-fit'); maskCanvas.classList.remove('canvas-1to1');
@@ -1178,7 +1029,6 @@
             canvas.style.transform = ''; maskCanvas.style.transform = '';
         }
 
-        // --- SORTING LOGIC ---
         function calculateWeights(data, w, h, modeOverride = null) {
             const weights = new Float32Array(w * h);
             const mode = modeOverride || colorModeInput.value;
@@ -1228,8 +1078,6 @@
             isSorting = true;
             currentRunIsRecording = isRecordingMode;
             btnSort.disabled = true; btnRecord.disabled = true; btnReset.disabled = false; btnUseInput.disabled = false; 
-            
-            // Enable Stop Button
             btnStop.disabled = false;
             btnStop.classList.remove('hidden');
             
@@ -1237,36 +1085,29 @@
             const gravity = gravityInput.value;
             let invertX = gravity.includes('l'), invertY = gravity.includes('u');
             
-            // Check if we have an active mask
             let hasActiveMask = false;
             if (isArtistMode && maskData) {
-                // Quick check if mask is empty
                 for(let i=0; i<maskData.length; i++) {
                     if (maskData[i] === 1) { hasActiveMask = true; break; }
                 }
-                
-                // Mask Animation: Fade out green shade
                 if (hasActiveMask) {
                     maskCanvas.style.opacity = '0';
-                    // Wait for fade (300ms) + dwell (200ms) = 500ms
                     await new Promise(r => setTimeout(r, 500));
                 }
             }
             
-            // Check if user pressed STOP during delay
             if (!isSorting) {
-                // Restore if stopped
                 maskCanvas.style.opacity = '';
                 return;
             }
 
             stats = { startTime: Date.now(), endTime: 0, totalFrames: 0, totalRenderTime: 0 };
-            statusText.textContent = "CALCULATING WEIGHTS...";
+            statusText.textContent = "CALCULATING...";
             await new Promise(r => setTimeout(r, 10)); 
             weightData = calculateWeights(pixelData, width, height);
 
             if (isRecordingMode) {
-                statusText.textContent = "RECORDING BUFFER...";
+                statusText.textContent = "BUFFERING...";
                 stream = canvas.captureStream(60); 
                 try {
                     mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9', videoBitsPerSecond: 80000000 });
@@ -1285,7 +1126,7 @@
                 const t0 = performance.now();
 
                 if (loopState === 'intro') {
-                    frameCount++; statusText.textContent = `RECORDING INTRO (${Math.floor((frameCount/60)*100)}%)`;
+                    frameCount++; statusText.textContent = `INTRO (${Math.floor((frameCount/60)*100)}%)`;
                     if (frameCount >= 60) { loopState = 'sorting'; frameCount = 0; }
                 } 
                 else if (loopState === 'sorting') {
@@ -1311,11 +1152,9 @@
                     }
 
                     function processSwap(idx1, idx2, invert) {
-                        // MASK CHECK: If masking is active, only swap if BOTH pixels are selected (1)
                         if (hasActiveMask) {
                             if (maskData[idx1] === 0 || maskData[idx2] === 0) return;
                         }
-
                         let shouldSwap = invert ? (weightData[idx1] > weightData[idx2]) : (weightData[idx1] < weightData[idx2]);
                         if (shouldSwap) { swap(idx1, idx2); changes = true; }
                     }
@@ -1328,11 +1167,11 @@
                     } else {
                         frameCount++; stats.totalFrames++;
                         progressBar.style.width = `${Math.min(100, (frameCount / maxFrames) * 100)}%`;
-                        statusText.textContent = `SORTING... FRAME ${frameCount}`;
+                        statusText.textContent = `FRAME ${frameCount}`;
                     }
                 } 
                 else if (loopState === 'outro') {
-                    frameCount++; statusText.textContent = `RECORDING OUTRO (${Math.floor((frameCount/60)*100)}%)`;
+                    frameCount++; statusText.textContent = `OUTRO (${Math.floor((frameCount/60)*100)}%)`;
                     if (frameCount >= 60) { finishRecording(); return; }
                 }
                 
@@ -1354,32 +1193,24 @@
         }
         function finishSortingOnly() { 
             isSorting = false; 
-            statusText.textContent = "SORTING COMPLETE"; 
+            statusText.textContent = "COMPLETE"; 
             progressBar.style.width = '100%'; 
             btnReset.disabled = false;
-            
-            // Revert UI state for Stop Button
             btnStop.disabled = true;
             btnStop.classList.add('hidden');
-            
-            // Revert Mask visibility so user can see what they selected again if they want
             maskCanvas.style.opacity = '';
         }
         function finishRecording() {
-            isSorting = false; statusText.textContent = "FINALIZING VIDEO..."; mediaRecorder.stop();
+            isSorting = false; statusText.textContent = "FINISHING..."; mediaRecorder.stop();
             mediaRecorder.onstop = () => {
                 videoURL = URL.createObjectURL(new Blob(recordedChunks, { type: 'video/webm' }));
-                statusText.textContent = "COMPLETE";
+                statusText.textContent = "DONE";
                 btnReset.disabled = false; 
                 progressBar.style.width = '100%'; 
                 progressBar.classList.add('bg-green-500');
-                
-                // Hide Stop Button
                 btnStop.disabled = true;
                 btnStop.classList.add('hidden');
                 maskCanvas.style.opacity = '';
-                
-                // Show "In Your Face" Download Dialog
                 downloadDialog.classList.remove('hidden');
             };
         }
