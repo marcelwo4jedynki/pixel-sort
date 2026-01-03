@@ -6,6 +6,7 @@ each color gets assigned a weight, then they get sorted by gravity
 
 use it [here](https://marcelwo4jedynki.github.io/pixel-sort/)
 
+<img width="2560" height="1271" alt="image" src="https://github.com/user-attachments/assets/c0ec22e7-acd5-44f0-869a-9bd208ffd65a" />
 
 ## Key Features
 
@@ -16,10 +17,6 @@ use it [here](https://marcelwo4jedynki.github.io/pixel-sort/)
 * **High-Fidelity Recording**: Generates "Pure" WebM files at up to 80Mbps bitrate to eliminate compression artifacts.
 
 * **Smart Color Sorting**: Uses a specialized (Value + Hue Bias) weight formula to prevent thick sediment layers and create clean color transitions.
-
-
-
-
 
 * **Process Statistics**: Live tracking of render times, average frame duration, and estimated FPS.
 
