@@ -1,12 +1,13 @@
 # Real Time Pixel Sorter (Web)
 
-minimalist pixel sorter inspired by powdertoy and use of pixel sorting in glitch art
+Minimalist pixel sorter inspired by powdertoy and use of pixel sorting in glitch art
 
-each color gets assigned a weight, then they get sorted by gravity
+Each color gets assigned a weight, then they get sorted by gravity
 
-use it [here](https://marcelwo4jedynki.github.io/pixel-sort/)
+You can use it [here!](https://marcelwo4jedynki.github.io/pixel-sort/)
 
-<img width="2560" height="1271" alt="image" src="https://github.com/user-attachments/assets/c0ec22e7-acd5-44f0-869a-9bd208ffd65a" />
+<img width="2558" height="1270" alt="image" src="https://github.com/user-attachments/assets/587a8580-11f7-4314-a7cf-6c2705a2adad" />
+
 
 ## Key Features
 
