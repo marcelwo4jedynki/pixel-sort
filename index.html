@@ -56,7 +56,7 @@
 
     <!-- Header -->
     <header class="flex justify-between items-center px-6 py-4 border-b-2 border-black z-30 bg-white">
-        <h1 class="text-xl font-bold tracking-tighter uppercase">Pixel Sorter <span class="text-xs font-normal opacity-50 ml-2">v2.7 Modes</span></h1>
+        <h1 class="text-xl font-bold tracking-tighter uppercase">Pixel Sorter <span class="text-xs font-normal opacity-50 ml-2">v2.8 Gravity</span></h1>
         
         <!-- Status & Stats Tooltip Container -->
         <div class="relative tooltip-trigger cursor-help py-2">
@@ -119,9 +119,9 @@
                 <div class="flex justify-center mb-4 text-red-600">
                     <i data-lucide="alert-triangle" class="w-12 h-12"></i>
                 </div>
-                <h2 class="text-xl font-bold mb-2 uppercase tracking-tighter">Interrupt Sorting?</h2>
+                <h2 class="text-xl font-bold mb-2 uppercase tracking-tighter">Interrupt Recording?</h2>
                 <p class="mb-8 text-gray-600 text-sm">
-                    A sort is currently in progress. Resetting now will discard the current video recording.
+                    A recording is currently in progress. Resetting now will discard the video file.
                 </p>
                 <div class="flex gap-4 justify-center">
                     <button id="btn-confirm-reset" class="px-6 py-2 bg-red-600 text-white font-bold uppercase hover:bg-red-700 transition-colors flex-1">
@@ -163,11 +163,17 @@
                     <span id="zoom-label" class="text-xs uppercase font-bold">Fit Screen</span>
                 </button>
                 <div class="h-4 w-px bg-gray-300"></div>
-                <select id="sort-mode" class="bg-transparent font-bold uppercase text-xs cursor-pointer outline-none hover:text-black transition-colors" title="Sorting Direction">
-                    <option value="xy">XY (Mix)</option>
-                    <option value="y">Y Only</option>
-                    <option value="x">X Only</option>
-                </select>
+                <div class="flex gap-2">
+                    <select id="sort-mode" class="bg-transparent font-bold uppercase text-xs cursor-pointer outline-none hover:text-black transition-colors" title="Sorting Mode">
+                        <option value="xy">XY (Mix)</option>
+                        <option value="y">Y Only</option>
+                        <option value="x">X Only</option>
+                    </select>
+                    <!-- Dynamic Direction Select -->
+                    <select id="gravity-direction" class="bg-transparent font-bold uppercase text-xs cursor-pointer outline-none hover:text-black transition-colors" title="Gravity Direction">
+                        <!-- Populated via JS -->
+                    </select>
+                </div>
             </div>
 
             <!-- Center: Actions -->
@@ -229,6 +235,7 @@
         const btnZoomToggle = document.getElementById('btn-zoom-toggle');
         const zoomLabel = document.getElementById('zoom-label');
         const sortModeInput = document.getElementById('sort-mode');
+        const gravityInput = document.getElementById('gravity-direction');
         
         const statusText = document.getElementById('status-text');
         const resDisplay = document.getElementById('resolution-display');
@@ -244,6 +251,7 @@
         let originalImage = null;
         let animationId = null;
         let isSorting = false;
+        let currentRunIsRecording = false; // Track active mode
         
         // View State
         let viewMode = 'fit'; // 'fit' or '1to1'
@@ -271,6 +279,45 @@
         let recordedChunks = [];
         let stream = null;
         let videoURL = null;
+
+        // --- Gravity Options Logic ---
+        function updateGravityOptions() {
+            const mode = sortModeInput.value;
+            gravityInput.innerHTML = ''; // Clear existing
+            
+            let options = [];
+            
+            if (mode === 'xy') {
+                options = [
+                    { val: 'dr', text: '↘ Down-Right' },
+                    { val: 'dl', text: '↙ Down-Left' },
+                    { val: 'ur', text: '↗ Up-Right' },
+                    { val: 'ul', text: '↖ Up-Left' }
+                ];
+            } else if (mode === 'y') {
+                options = [
+                    { val: 'd', text: '↓ Down' },
+                    { val: 'u', text: '↑ Up' }
+                ];
+            } else if (mode === 'x') {
+                options = [
+                    { val: 'r', text: '→ Right' },
+                    { val: 'l', text: '← Left' }
+                ];
+            }
+            
+            options.forEach(opt => {
+                const el = document.createElement('option');
+                el.value = opt.val;
+                el.textContent = opt.text;
+                gravityInput.appendChild(el);
+            });
+        }
+        
+        // Initialize options on load
+        updateGravityOptions();
+        sortModeInput.addEventListener('change', updateGravityOptions);
+
 
         // --- Event Listeners ---
         dropZone.addEventListener('click', () => fileInput.click());
@@ -332,9 +379,11 @@
         btnRecord.addEventListener('click', () => startSortingProcess(true));
         
         btnReset.addEventListener('click', () => {
-            if (isSorting) {
+            if (isSorting && currentRunIsRecording) {
+                // Only show confirmation if we are actually recording
                 confirmResetDialog.classList.remove('hidden');
             } else {
+                // Instant reset for normal sorting or idle
                 resetCanvasState();
             }
         });
@@ -451,6 +500,7 @@
                 mediaRecorder.stop();
             }
             isSorting = false;
+            currentRunIsRecording = false;
             
             if (videoURL) URL.revokeObjectURL(videoURL);
             btnDownload.disabled = true;
@@ -586,13 +636,26 @@
         async function startSortingProcess(isRecordingMode) {
             if (isSorting) return;
             isSorting = true;
+            currentRunIsRecording = isRecordingMode;
             btnSort.disabled = true;
             btnRecord.disabled = true;
             btnReset.disabled = false; // Reset enabled for interrupt
             btnDownload.disabled = true;
             
-            // Get Current Sort Mode
+            // Get Mode & Gravity
             const mode = sortModeInput.value;
+            const gravity = gravityInput.value;
+            
+            // Determine inversion based on direction selected
+            // Default logic: Heavy falls (y+) and Heavy moves right (x+)
+            // If invertY is true: Heavy rises (y-)
+            // If invertX is true: Heavy moves left (x-)
+            let invertX = false;
+            let invertY = false;
+            
+            // Map gravity values
+            if (gravity.includes('u')) invertY = true;  // Up
+            if (gravity.includes('l')) invertX = true;  // Left
             
             // Reset stats
             stats = { startTime: Date.now(), endTime: 0, totalFrames: 0, totalRenderTime: 0 };
@@ -681,13 +744,23 @@
                     // Physics Pass
                     if (performVertical) {
                         // Vertical Pass
+                        // if invertY is false (Down): heavy (low val) < light (high val) -> swap to put heavy at idx2 (bottom)
+                        // if invertY is true (Up): heavy (low val) > light (high val) ?? No.
+                        // We compare top (idx1) and bottom (idx2).
+                        // Standard (Down): If Top < Bottom (Top is heavier), Swap.
+                        // Inverted (Up): If Top > Bottom (Top is lighter), Swap (put lighter at bottom, heavier at top).
+                        
                         for (let y = 0; y < height - 1; y += 2) {
                             const rowOffset = y * width;
                             const nextRowOffset = (y + 1) * width;
                             for (let x = 0; x < width; x++) {
                                 const idx1 = rowOffset + x;
                                 const idx2 = nextRowOffset + x;
-                                if (weightData[idx1] < weightData[idx2]) { 
+                                let shouldSwap = invertY 
+                                    ? (weightData[idx1] > weightData[idx2]) 
+                                    : (weightData[idx1] < weightData[idx2]);
+                                    
+                                if (shouldSwap) { 
                                     swap(idx1, idx2);
                                     changes = true;
                                 }
@@ -699,7 +772,11 @@
                             for (let x = 0; x < width; x++) {
                                 const idx1 = rowOffset + x;
                                 const idx2 = nextRowOffset + x;
-                                if (weightData[idx1] < weightData[idx2]) {
+                                let shouldSwap = invertY 
+                                    ? (weightData[idx1] > weightData[idx2]) 
+                                    : (weightData[idx1] < weightData[idx2]);
+
+                                if (shouldSwap) {
                                     swap(idx1, idx2);
                                     changes = true;
                                 }
@@ -709,12 +786,19 @@
                     
                     if (performHorizontal) {
                         // Horizontal Pass
+                        // Standard (Right): If Left < Right (Left is heavier), Swap.
+                        // Inverted (Left): If Left > Right (Left is lighter), Swap.
+                        
                         for (let y = 0; y < height; y++) {
                             const rowOffset = y * width;
                             for (let x = 0; x < width - 1; x += 2) {
                                 const idx1 = rowOffset + x;
                                 const idx2 = rowOffset + x + 1;
-                                if (weightData[idx1] < weightData[idx2]) {
+                                let shouldSwap = invertX 
+                                    ? (weightData[idx1] > weightData[idx2]) 
+                                    : (weightData[idx1] < weightData[idx2]);
+
+                                if (shouldSwap) {
                                     swap(idx1, idx2);
                                     changes = true;
                                 }
@@ -725,7 +809,11 @@
                             for (let x = 1; x < width - 1; x += 2) {
                                 const idx1 = rowOffset + x;
                                 const idx2 = rowOffset + x + 1;
-                                if (weightData[idx1] < weightData[idx2]) {
+                                let shouldSwap = invertX 
+                                    ? (weightData[idx1] > weightData[idx2]) 
+                                    : (weightData[idx1] < weightData[idx2]);
+
+                                if (shouldSwap) {
                                     swap(idx1, idx2);
                                     changes = true;
                                 }
