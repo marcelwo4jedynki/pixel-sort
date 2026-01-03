@@ -23,7 +23,7 @@
 
     <!-- Header -->
     <header class="flex justify-between items-center px-6 py-4 border-b-2 border-black">
-        <h1 class="text-xl font-bold tracking-tighter uppercase">Pixel Sorter <span class="text-xs font-normal opacity-50 ml-2">v2.2 Web</span></h1>
+        <h1 class="text-xl font-bold tracking-tighter uppercase">Pixel Sorter <span class="text-xs font-normal opacity-50 ml-2">v2.3 Hi-Res</span></h1>
         <div class="text-xs" id="status-text">WAITING FOR IMAGE</div>
     </header>
 
@@ -181,8 +181,8 @@
             if (videoURL) URL.revokeObjectURL(videoURL);
             btnDownload.disabled = true;
 
-            // Resize Canvas (Limit to 1080p for browser performance safety)
-            const maxDim = 1920;
+            // Resize Canvas (Allow up to 4K now)
+            const maxDim = 3840; // 4K Resolution support
             let w = originalImage.width;
             let h = originalImage.height;
             
@@ -301,12 +301,21 @@
                     'video/mp4'               // Safari / Others
                 ];
 
-                let options = undefined;
+                // Base configuration for HIGH QUALITY
+                let options = {
+                    videoBitsPerSecond: 80000000 // 80 Mbps for "Pure" quality
+                };
+                
+                let supportedType = null;
                 for (const type of mimeTypes) {
                     if (MediaRecorder.isTypeSupported(type)) {
-                        options = { mimeType: type };
+                        supportedType = type;
                         break;
                     }
+                }
+
+                if (supportedType) {
+                    options.mimeType = supportedType;
                 }
                 
                 try {
