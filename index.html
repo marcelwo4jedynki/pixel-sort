@@ -29,7 +29,9 @@
         .canvas-fit {
             max-width: 100%;
             max-height: 100%;
-            object-fit: contain;
+            /* Removed object-fit: contain to fix coordinate mapping bugs.
+               Flexbox in the parent will handle centering and aspect ratio
+               by shrinking the element itself. */
         }
         
         /* 1:1 Mode */
@@ -65,7 +67,7 @@
     <header class="border-b-2 border-black z-30 bg-white flex flex-col shrink-0">
         <!-- Main Title Row -->
         <div class="flex justify-between items-center px-4 sm:px-6 py-3 sm:py-4">
-            <h1 class="text-lg sm:text-xl font-bold tracking-tighter uppercase truncate">Real Time Pixel Sorter <span class="hidden sm:inline text-xs font-normal opacity-50 ml-2">v3.4 Artist Mode</span></h1>
+            <h1 class="text-lg sm:text-xl font-bold tracking-tighter uppercase truncate">Real Time Pixel Sorter <span class="hidden sm:inline text-xs font-normal opacity-50 ml-2">v3.5 Artist Mode</span></h1>
             <div class="text-xs font-bold bg-black text-white px-2 py-1 uppercase tracking-wider transition-colors shrink-0" id="status-text">WAITING</div>
         </div>
         
@@ -149,6 +151,38 @@
                     <button id="btn-cancel-reset" class="px-6 py-2 border-2 border-black font-bold uppercase hover:bg-gray-100 transition-colors flex-1">
                         Cancel
                     </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Render Complete / Download Dialog -->
+        <div id="download-dialog" class="absolute inset-0 bg-white/95 z-40 hidden flex flex-col items-center justify-center p-8 text-center backdrop-blur-md animate-in fade-in zoom-in-95 duration-200">
+            <div class="max-w-lg w-full border-4 border-black bg-white p-8 shadow-2xl relative">
+                <button id="btn-close-dl" class="absolute top-4 right-4 text-gray-400 hover:text-black transition-colors">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+                
+                <div class="flex justify-center mb-6 text-green-600">
+                    <i data-lucide="check-circle-2" class="w-16 h-16"></i>
+                </div>
+                
+                <h2 class="text-3xl font-black mb-2 uppercase tracking-tighter">Render Complete</h2>
+                <p class="mb-8 text-gray-600">Your pixel sort recording is ready.</p>
+                
+                <div class="flex flex-col gap-4">
+                    <button id="btn-dl-video-main" class="w-full py-4 bg-black text-white text-lg font-bold uppercase hover:bg-gray-800 transition-colors flex items-center justify-center gap-3">
+                        <i data-lucide="film" class="w-5 h-5"></i> Download Video
+                    </button>
+                    
+                    <button id="btn-dl-image-main" class="w-full py-3 border-2 border-black text-black font-bold uppercase hover:bg-gray-100 transition-colors flex items-center justify-center gap-3">
+                        <i data-lucide="image" class="w-5 h-5"></i> Download Current Frame
+                    </button>
+                </div>
+                
+                <div class="mt-6 pt-6 border-t border-gray-100">
+                     <button id="btn-restart-dl" class="text-xs uppercase font-bold text-gray-400 hover:text-black tracking-widest">
+                        Close & Continue Editing
+                     </button>
                 </div>
             </div>
         </div>
@@ -336,8 +370,8 @@
                     <button id="btn-fullscreen" class="p-2 border-2 border-black hover:bg-black hover:text-white transition-colors" title="Maximize">
                         <i data-lucide="maximize" class="w-4 h-4"></i>
                     </button>
-                    <button id="btn-download" class="p-2 border-2 border-black hover:bg-black hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled title="Download">
-                        <i data-lucide="download" class="w-4 h-4"></i>
+                    <button id="btn-download" class="p-2 border-2 border-black hover:bg-black hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled title="Download Image (PNG)">
+                        <i data-lucide="image-down" class="w-4 h-4"></i>
                     </button>
                 </div>
             </div>
@@ -371,6 +405,13 @@
         const confirmResetDialog = document.getElementById('confirm-reset-dialog');
         const btnConfirmReset = document.getElementById('btn-confirm-reset');
         const btnCancelReset = document.getElementById('btn-cancel-reset');
+
+        // Download Dialog Elements
+        const downloadDialog = document.getElementById('download-dialog');
+        const btnDlVideoMain = document.getElementById('btn-dl-video-main');
+        const btnDlImageMain = document.getElementById('btn-dl-image-main');
+        const btnCloseDl = document.getElementById('btn-close-dl');
+        const btnRestartDl = document.getElementById('btn-restart-dl');
 
         // Buttons & Stats
         const btnSort = document.getElementById('btn-sort');
@@ -640,9 +681,6 @@
 
         function applyShape(cx, cy) {
             // Finalize shape
-            // (Preview already sets data, but we need to ensure it's locked in based on start/end)
-            // Actually preview restores snapshot then fills, so the data in maskData is correct currently.
-            // Just need to ensure we don't revert.
             renderMaskOverlay();
         }
 
@@ -781,7 +819,14 @@
         btnUseInput.addEventListener('click', setAsInput);
         btnConfirmReset.addEventListener('click', () => { confirmResetDialog.classList.add('hidden'); resetCanvasState(); });
         btnCancelReset.addEventListener('click', () => confirmResetDialog.classList.add('hidden'));
-        btnDownload.addEventListener('click', downloadVideo);
+        
+        // Updated Download Logic
+        btnDownload.addEventListener('click', downloadImage);
+        btnDlVideoMain.addEventListener('click', downloadVideo);
+        btnDlImageMain.addEventListener('click', downloadImage);
+        btnCloseDl.addEventListener('click', () => downloadDialog.classList.add('hidden'));
+        btnRestartDl.addEventListener('click', () => downloadDialog.classList.add('hidden'));
+
         btnFullscreen.addEventListener('click', toggleFullscreen);
         btnResizeFit.addEventListener('click', () => { resizeDialog.classList.add('hidden'); initCanvas(originalImage, true); });
         btnKeepOrig.addEventListener('click', () => { resizeDialog.classList.add('hidden'); initCanvas(originalImage, false); });
@@ -861,7 +906,9 @@
             if (mediaRecorder && mediaRecorder.state !== 'inactive') { mediaRecorder.onstop = null; mediaRecorder.stop(); }
             isSorting = false; currentRunIsRecording = false;
             if (videoURL) URL.revokeObjectURL(videoURL);
-            btnDownload.disabled = true; btnSort.disabled = false; btnRecord.disabled = false; btnUseInput.disabled = false;
+            downloadDialog.classList.add('hidden');
+            // Download button now stays enabled if image exists
+            btnSort.disabled = false; btnRecord.disabled = false; btnUseInput.disabled = false;
             progressBar.style.width = '0%'; progressBar.classList.remove('bg-green-500'); statusText.textContent = "READY";
             statTime.textContent = "--"; statFrames.textContent = "--"; statRender.textContent = "--"; statFps.textContent = "--";
             
@@ -892,7 +939,9 @@
 
             canvasWrapper.classList.remove('hidden');
             resDisplay.textContent = `${w} x ${h}`; statusText.textContent = "READY";
-            btnSort.disabled = false; btnRecord.disabled = false; btnReset.disabled = false; btnDownload.disabled = true; btnUseInput.disabled = false;
+            btnSort.disabled = false; btnRecord.disabled = false; btnReset.disabled = false; 
+            btnDownload.disabled = false; // Enable image download immediately
+            btnUseInput.disabled = false;
             
             viewMode = 'fit'; zoomLabel.textContent = "Fit";
             canvas.classList.add('canvas-fit'); canvas.classList.remove('canvas-1to1');
@@ -950,7 +999,8 @@
             if (isSorting) return;
             isSorting = true;
             currentRunIsRecording = isRecordingMode;
-            btnSort.disabled = true; btnRecord.disabled = true; btnReset.disabled = false; btnUseInput.disabled = false; btnDownload.disabled = true;
+            btnSort.disabled = true; btnRecord.disabled = true; btnReset.disabled = false; btnUseInput.disabled = false; 
+            // btnDownload remains active to grab snapshots if needed, but video dl happens at end
             
             const mode = sortModeInput.value;
             const gravity = gravityInput.value;
@@ -1057,16 +1107,36 @@
                 statFps.textContent = (1000 / avgMs).toFixed(0);
             }
         }
-        function finishSortingOnly() { isSorting = false; statusText.textContent = "SORTING COMPLETE"; progressBar.style.width = '100%'; btnReset.disabled = false; }
+        function finishSortingOnly() { 
+            isSorting = false; 
+            statusText.textContent = "SORTING COMPLETE"; 
+            progressBar.style.width = '100%'; 
+            btnReset.disabled = false;
+        }
         function finishRecording() {
             isSorting = false; statusText.textContent = "FINALIZING VIDEO..."; mediaRecorder.stop();
             mediaRecorder.onstop = () => {
                 videoURL = URL.createObjectURL(new Blob(recordedChunks, { type: 'video/webm' }));
-                statusText.textContent = "COMPLETE. DOWNLOAD READY.";
-                btnReset.disabled = false; btnDownload.disabled = false; progressBar.style.width = '100%'; progressBar.classList.add('bg-green-500');
+                statusText.textContent = "COMPLETE";
+                btnReset.disabled = false; 
+                progressBar.style.width = '100%'; 
+                progressBar.classList.add('bg-green-500');
+                
+                // Show "In Your Face" Download Dialog
+                downloadDialog.classList.remove('hidden');
             };
         }
         function downloadVideo() { if (videoURL) { const a = document.createElement('a'); a.href = videoURL; a.download = 'pixel_sort_result.webm'; document.body.appendChild(a); a.click(); document.body.removeChild(a); } }
+        
+        function downloadImage() {
+            const link = document.createElement('a');
+            link.download = 'pixel_sort_frame.png';
+            link.href = canvas.toDataURL('image/png');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
         function toggleFullscreen() { if (!document.fullscreenElement) canvasWrapper.requestFullscreen(); else document.exitFullscreen(); }
     </script>
 </body>
