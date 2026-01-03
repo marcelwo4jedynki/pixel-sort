@@ -56,7 +56,7 @@
 
     <!-- Header -->
     <header class="flex justify-between items-center px-6 py-4 border-b-2 border-black z-30 bg-white">
-        <h1 class="text-xl font-bold tracking-tighter uppercase">Real Time Pixel Sorter <span class="text-xs font-normal opacity-50 ml-2">v2.9.1 Endless</span></h1>
+        <h1 class="text-xl font-bold tracking-tighter uppercase">Real Time Pixel Sorter <span class="text-xs font-normal opacity-50 ml-2">v3.0 Color Science</span></h1>
         
         <!-- Status & Stats Tooltip Container -->
         <div class="relative tooltip-trigger cursor-help py-2">
@@ -163,8 +163,24 @@
                     <span id="zoom-label" class="text-xs uppercase font-bold">Fit Screen</span>
                 </button>
                 <div class="h-4 w-px bg-gray-300"></div>
+                
                 <div class="flex gap-2">
-                    <select id="sort-mode" class="bg-transparent font-bold uppercase text-xs cursor-pointer outline-none hover:text-black transition-colors" title="Sorting Mode">
+                     <select id="color-mode" class="bg-transparent font-bold uppercase text-xs cursor-pointer outline-none hover:text-black transition-colors" title="Color Space / Sorting Algorithm">
+                        <option value="smart">Smart (HSV+)</option>
+                        <option value="cielab">CIELAB (L*)</option>
+                        <option value="luma">Luminance</option>
+                        <option value="classic">Classic (8-bit)</option>
+                        <option value="sat">Saturation</option>
+                        <option value="red">Red</option>
+                        <option value="green">Green</option>
+                        <option value="blue">Blue</option>
+                    </select>
+                </div>
+                
+                <div class="h-4 w-px bg-gray-300"></div>
+                
+                <div class="flex gap-2">
+                    <select id="sort-mode" class="bg-transparent font-bold uppercase text-xs cursor-pointer outline-none hover:text-black transition-colors" title="Axis Mode">
                         <option value="xy">XY (Mix)</option>
                         <option value="y">Y Only</option>
                         <option value="x">X Only</option>
@@ -240,6 +256,7 @@
         const zoomLabel = document.getElementById('zoom-label');
         const sortModeInput = document.getElementById('sort-mode');
         const gravityInput = document.getElementById('gravity-direction');
+        const colorModeInput = document.getElementById('color-mode');
         
         const statusText = document.getElementById('status-text');
         const resDisplay = document.getElementById('resolution-display');
@@ -629,29 +646,78 @@
             canvas.style.transform = '';
         }
 
-        // --- Physics Engine ---
+        // --- Physics Engine (Calculates weights based on Mode) ---
 
         function calculateWeights(data, w, h) {
             const weights = new Float32Array(w * h);
+            const mode = colorModeInput.value;
+            
             for (let i = 0; i < w * h; i++) {
                 const idx = i * 4;
-                const r = data[idx] / 255;
-                const g = data[idx + 1] / 255;
-                const b = data[idx + 2] / 255;
-
-                const max = Math.max(r, g, b);
-                const min = Math.min(r, g, b);
-                const v = max;
-                const d = max - min;
+                const r = data[idx];     // 0-255
+                const g = data[idx + 1];
+                const b = data[idx + 2];
+                // Normalize 0-1 for standard calculations
+                const rn = r / 255;
+                const gn = g / 255;
+                const bn = b / 255;
                 
-                let hue = 0;
-                if (max !== min) {
-                    if (max === r) hue = (g - b) / d + (g < b ? 6 : 0);
-                    else if (max === g) hue = (b - r) / d + 2;
-                    else if (max === b) hue = (r - g) / d + 4;
-                    hue /= 6;
+                let weight = 0;
+
+                if (mode === 'smart') {
+                    // Smart (HSV): Value + Hue Bias
+                    const max = Math.max(rn, gn, bn);
+                    const min = Math.min(rn, gn, bn);
+                    const d = max - min;
+                    let hue = 0;
+                    if (max !== min) {
+                        if (max === rn) hue = (gn - bn) / d + (gn < bn ? 6 : 0);
+                        else if (max === gn) hue = (bn - rn) / d + 2;
+                        else if (max === bn) hue = (rn - gn) / d + 4;
+                        hue /= 6;
+                    }
+                    weight = max + (hue * 0.005);
+                } 
+                else if (mode === 'classic') {
+                    // Classic: 8-bit quantized luminance (mimics retro behavior)
+                    const luma = (0.299 * r + 0.587 * g + 0.114 * b);
+                    // Quantize to steps of 24 (or similar retro feel) to force banding
+                    weight = Math.floor(luma / 24) * 24; 
                 }
-                weights[i] = v + (hue * 0.005);
+                else if (mode === 'cielab') {
+                    // CIELAB L*: Perceptual Lightness (Approximation)
+                    // 1. RGB to Linear
+                    const lin = (c) => (c <= 0.04045) ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+                    const Rl = lin(rn), Gl = lin(gn), Bl = lin(bn);
+                    // 2. Linear RGB to Y (Luminance part of XYZ)
+                    const Y = 0.2126 * Rl + 0.7152 * Gl + 0.0722 * Bl;
+                    // 3. Y to L*
+                    const Yn = 1.0; // Reference white
+                    const f = (t) => (t > 0.008856) ? Math.pow(t, 1/3) : (7.787 * t) + (16 / 116);
+                    weight = (116 * f(Y / Yn)) - 16;
+                }
+                else if (mode === 'luma') {
+                    // Rec. 709 Luminance (High Precision)
+                    weight = 0.2126 * rn + 0.7152 * gn + 0.0722 * bn;
+                }
+                else if (mode === 'sat') {
+                    // Saturation
+                    const max = Math.max(rn, gn, bn);
+                    const min = Math.min(rn, gn, bn);
+                    weight = (max === 0) ? 0 : (max - min) / max;
+                }
+                else if (mode === 'red') {
+                    // Red Isolation (with tiny bias to prevent collisions)
+                    weight = rn + (gn * 0.001) + (bn * 0.001);
+                }
+                else if (mode === 'green') {
+                    weight = gn + (rn * 0.001) + (bn * 0.001);
+                }
+                else if (mode === 'blue') {
+                    weight = bn + (rn * 0.001) + (gn * 0.001);
+                }
+                
+                weights[i] = weight;
             }
             return weights;
         }
@@ -697,13 +763,9 @@
             const gravity = gravityInput.value;
             
             // Determine inversion based on direction selected
-            // Default logic: Heavy falls (y+) and Heavy moves right (x+)
-            // If invertY is true: Heavy rises (y-)
-            // If invertX is true: Heavy moves left (x-)
             let invertX = false;
             let invertY = false;
             
-            // Map gravity values
             if (gravity.includes('u')) invertY = true;  // Up
             if (gravity.includes('l')) invertX = true;  // Left
             
@@ -794,12 +856,6 @@
                     // Physics Pass
                     if (performVertical) {
                         // Vertical Pass
-                        // if invertY is false (Down): heavy (low val) < light (high val) -> swap to put heavy at idx2 (bottom)
-                        // if invertY is true (Up): heavy (low val) > light (high val) ?? No.
-                        // We compare top (idx1) and bottom (idx2).
-                        // Standard (Down): If Top < Bottom (Top is heavier), Swap.
-                        // Inverted (Up): If Top > Bottom (Top is lighter), Swap (put lighter at bottom, heavier at top).
-                        
                         for (let y = 0; y < height - 1; y += 2) {
                             const rowOffset = y * width;
                             const nextRowOffset = (y + 1) * width;
@@ -836,9 +892,6 @@
                     
                     if (performHorizontal) {
                         // Horizontal Pass
-                        // Standard (Right): If Left < Right (Left is heavier), Swap.
-                        // Inverted (Left): If Left > Right (Left is lighter), Swap.
-                        
                         for (let y = 0; y < height; y++) {
                             const rowOffset = y * width;
                             for (let x = 0; x < width - 1; x += 2) {
