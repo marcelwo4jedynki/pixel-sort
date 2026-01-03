@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Sorter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Custom scrollbar for minimalist look */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #fff; }
+        ::-webkit-scrollbar-thumb { background: #000; border: 2px solid #fff; }
+        
+        /* Hide cursor in fullscreen if needed */
+        .fullscreen-canvas { cursor: none; }
+    </style>
+</head>
+<body class="bg-white text-black font-mono antialiased flex flex-col h-screen overflow-hidden selection:bg-black selection:text-white">
+
+    <!-- Header -->
+    <header class="flex justify-between items-center px-6 py-4 border-b-2 border-black">
+        <h1 class="text-xl font-bold tracking-tighter uppercase">Pixel Sorter <span class="text-xs font-normal opacity-50 ml-2">v2.1 Web</span></h1>
+        <div class="text-xs" id="status-text">WAITING FOR IMAGE</div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 relative flex items-center justify-center bg-gray-50 overflow-hidden p-4" id="main-container">
+        
+        <!-- Empty State / Drop Zone -->
+        <div id="drop-zone" class="absolute inset-4 border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 hover:border-black hover:text-black transition-colors cursor-pointer z-10">
+            <i data-lucide="upload" class="w-12 h-12 mb-4"></i>
+            <p class="uppercase text-sm tracking-widest">Drop Image or Click to Upload</p>
+            <input type="file" id="file-input" class="hidden" accept="image/*">
+        </div>
+
+        <!-- Canvas Container -->
+        <div class="relative shadow-2xl border-4 border-black hidden" id="canvas-wrapper">
+            <canvas id="canvas"></canvas>
+            <!-- Progress Overlay -->
+            <div id="progress-bar-container" class="absolute bottom-0 left-0 h-1 bg-black w-0 transition-all duration-300"></div>
+        </div>
+
+    </main>
+
+    <!-- Controls Footer -->
+    <footer class="border-t-2 border-black bg-white p-4">
+        <div class="flex flex-wrap gap-4 items-center justify-center md:justify-between max-w-7xl mx-auto">
+            
+            <!-- Left: Info -->
+            <div class="flex gap-4 items-center text-sm text-gray-500">
+                <span id="resolution-display">0 x 0</span>
+            </div>
+
+            <!-- Center: Actions -->
+            <div class="flex gap-3">
+                <button id="btn-reset" class="px-6 py-2 border-2 border-black uppercase text-sm font-bold hover:bg-black hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled>
+                    Reset
+                </button>
+                <div class="w-px bg-gray-300 mx-2"></div>
+                <button id="btn-sort" class="px-6 py-2 border-2 border-black uppercase text-sm font-bold hover:bg-black hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled>
+                    Start Sort
+                </button>
+                <button id="btn-record" class="px-6 py-2 border-2 border-black bg-black text-white uppercase text-sm font-bold hover:bg-white hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled>
+                    Record Sort
+                </button>
+            </div>
+
+            <!-- Right: Tools -->
+            <div class="flex gap-3">
+                <button id="btn-fullscreen" class="p-2 border-2 border-black hover:bg-black hover:text-white transition-colors" title="Maximize Preview">
+                    <i data-lucide="maximize" class="w-5 h-5"></i>
+                </button>
+                <button id="btn-download" class="p-2 border-2 border-black hover:bg-black hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled title="Download WebM">
+                    <i data-lucide="download" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // --- Icons ---
+        lucide.createIcons();
+
+        // --- Core Elements ---
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const canvas = document.getElementById('canvas');
+        const canvasWrapper = document.getElementById('canvas-wrapper');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        
+        // Buttons
+        const btnSort = document.getElementById('btn-sort');
+        const btnRecord = document.getElementById('btn-record');
+        const btnReset = document.getElementById('btn-reset');
+        const btnDownload = document.getElementById('btn-download');
+        const btnFullscreen = document.getElementById('btn-fullscreen');
+        const statusText = document.getElementById('status-text');
+        const resDisplay = document.getElementById('resolution-display');
+        const progressBar = document.getElementById('progress-bar-container');
+
+        // --- State ---
+        let originalImage = null;
+        let animationId = null;
+        let isSorting = false;
+        
+        // Data Buffers
+        let pixelData = null; // Uint8ClampedArray (Visuals)
+        let weightData = null; // Float32Array (Physics)
+        let width = 0;
+        let height = 0;
+
+        // Recording State
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let stream = null;
+        let videoURL = null;
+
+        // --- Event Listeners ---
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('bg-gray-100'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('bg-gray-100'));
+        dropZone.addEventListener('drop', handleDrop);
+        fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+        
+        btnSort.addEventListener('click', () => startSortingProcess(false));
+        btnRecord.addEventListener('click', () => startSortingProcess(true));
+        
+        btnReset.addEventListener('click', resetCanvas);
+        btnDownload.addEventListener('click', downloadVideo);
+        btnFullscreen.addEventListener('click', toggleFullscreen);
+
+        // --- File Handling ---
+        function handleDrop(e) {
+            e.preventDefault();
+            dropZone.classList.remove('bg-gray-100');
+            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        }
+
+        function handleFile(file) {
+            if (!file || !file.type.startsWith('image/')) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    originalImage = img;
+                    resetCanvas();
+                    dropZone.classList.add('hidden');
+                    canvasWrapper.classList.remove('hidden');
+                    btnSort.disabled = false;
+                    btnRecord.disabled = false;
+                    btnReset.disabled = false;
+                    statusText.textContent = "READY TO SORT";
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // --- Canvas Setup & Helpers ---
+        function resetCanvas() {
+            if (!originalImage) return;
+
+            // Stop any running process
+            if (animationId) cancelAnimationFrame(animationId);
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+            isSorting = false;
+            
+            // Clean up old video
+            if (videoURL) URL.revokeObjectURL(videoURL);
+            btnDownload.disabled = true;
+
+            // Resize Canvas (Limit to 1080p for browser performance safety)
+            const maxDim = 1920;
+            let w = originalImage.width;
+            let h = originalImage.height;
+            
+            if (w > maxDim || h > maxDim) {
+                const ratio = Math.min(maxDim / w, maxDim / h);
+                w = Math.round(w * ratio);
+                h = Math.round(h * ratio);
+            }
+
+            canvas.width = w;
+            canvas.height = h;
+            width = w;
+            height = h;
+
+            // Draw original
+            ctx.drawImage(originalImage, 0, 0, w, h);
+            
+            // Initial Data Extraction
+            const imageData = ctx.getImageData(0, 0, w, h);
+            pixelData = imageData.data; // Reference to the underlying buffer
+            
+            resDisplay.textContent = `${w} x ${h}`;
+            progressBar.style.width = '0%';
+            progressBar.classList.remove('bg-green-500');
+            statusText.textContent = "READY";
+            
+            // Reset buttons
+            btnSort.disabled = false;
+            btnRecord.disabled = false;
+        }
+
+        // --- Physics Engine (The Smart Logic) ---
+
+        function calculateWeights(data, w, h) {
+            // Formula: Value + (Hue * 0.005)
+            // Stored in Float32Array for precision
+            const weights = new Float32Array(w * h);
+            
+            for (let i = 0; i < w * h; i++) {
+                const idx = i * 4;
+                const r = data[idx] / 255;
+                const g = data[idx + 1] / 255;
+                const b = data[idx + 2] / 255;
+
+                const max = Math.max(r, g, b);
+                const min = Math.min(r, g, b);
+                const v = max;
+                const d = max - min;
+                
+                let hue = 0;
+                if (max !== min) {
+                    if (max === r) hue = (g - b) / d + (g < b ? 6 : 0);
+                    else if (max === g) hue = (b - r) / d + 2;
+                    else if (max === b) hue = (r - g) / d + 4;
+                    hue /= 6; // 0.0 - 1.0
+                }
+
+                // Hue (0-1) * 0.005 is small enough not to jump a V step
+                weights[i] = v + (hue * 0.005);
+            }
+            return weights;
+        }
+
+        function swap(i1, i2) {
+            // Swap Weights
+            const tempW = weightData[i1];
+            weightData[i1] = weightData[i2];
+            weightData[i2] = tempW;
+
+            // Swap Pixels (RGBA)
+            const p1 = i1 * 4;
+            const p2 = i2 * 4;
+            
+            const r = pixelData[p1];
+            const g = pixelData[p1+1];
+            const b = pixelData[p1+2];
+            const a = pixelData[p1+3];
+
+            pixelData[p1] = pixelData[p2];
+            pixelData[p1+1] = pixelData[p2+1];
+            pixelData[p1+2] = pixelData[p2+2];
+            pixelData[p1+3] = pixelData[p2+3];
+
+            pixelData[p2] = r;
+            pixelData[p2+1] = g;
+            pixelData[p2+2] = b;
+            pixelData[p2+3] = a;
+        }
+
+        // --- Sorting Animation Loop ---
+
+        async function startSortingProcess(isRecordingMode) {
+            if (isSorting) return;
+            isSorting = true;
+            btnSort.disabled = true;
+            btnRecord.disabled = true;
+            btnReset.disabled = true;
+            btnDownload.disabled = true;
+
+            // 1. Prepare Weights
+            statusText.textContent = "CALCULATING WEIGHTS...";
+            // Allow UI update
+            await new Promise(r => setTimeout(r, 10)); 
+            weightData = calculateWeights(pixelData, width, height);
+
+            // 2. Setup Recording (Only if requested)
+            if (isRecordingMode) {
+                statusText.textContent = "RECORDING BUFFER...";
+                stream = canvas.captureStream(60); // 60 FPS
+                
+                // Robust Codec Selection
+                const mimeTypes = [
+                    'video/webm; codecs=vp9', // Chrome, Firefox (Best)
+                    'video/webm; codecs=vp8', // Fallback
+                    'video/webm',             // Generic
+                    'video/mp4'               // Safari / Others
+                ];
+
+                let options = undefined;
+                for (const type of mimeTypes) {
+                    if (MediaRecorder.isTypeSupported(type)) {
+                        options = { mimeType: type };
+                        break;
+                    }
+                }
+                
+                try {
+                    mediaRecorder = new MediaRecorder(stream, options);
+                } catch (err) {
+                    console.error('MediaRecorder init failed:', err);
+                    statusText.textContent = "RECORDER ERROR (SEE CONSOLE)";
+                    isSorting = false;
+                    btnSort.disabled = false;
+                    btnRecord.disabled = false;
+                    btnReset.disabled = false;
+                    return;
+                }
+
+                recordedChunks = [];
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) recordedChunks.push(e.data);
+                };
+                mediaRecorder.start();
+            }
+
+            // 3. Animation Loop Setup
+            let frameCount = 0;
+            let consecutiveIdleFrames = 0;
+            const maxFrames = (width + height) * 2; // Est.
+            const bufferFrames = 60;
+            
+            // If recording, start with Intro. If not, jump straight to sorting.
+            let loopState = isRecordingMode ? 'intro' : 'sorting'; 
+
+            function step() {
+                if (!isSorting) return;
+
+                // --- LOGIC ---
+                if (loopState === 'intro') {
+                    frameCount++;
+                    statusText.textContent = `RECORDING INTRO (${Math.floor((frameCount/bufferFrames)*100)}%)`;
+                    if (frameCount >= bufferFrames) {
+                        loopState = 'sorting';
+                        frameCount = 0;
+                    }
+                } 
+                else if (loopState === 'sorting') {
+                    let changes = false;
+                    const isVertical = (frameCount % 2 === 0);
+
+                    // Physics Pass
+                    
+                    if (isVertical) {
+                        // Vertical Pass (Compare y with y+1)
+                        // Pass 0: Even rows (0, 2, 4...)
+                        for (let y = 0; y < height - 1; y += 2) {
+                            const rowOffset = y * width;
+                            const nextRowOffset = (y + 1) * width;
+                            for (let x = 0; x < width; x++) {
+                                const idx1 = rowOffset + x;
+                                const idx2 = nextRowOffset + x;
+                                if (weightData[idx1] < weightData[idx2]) { // Heavy (low val) falls (high idx)
+                                    swap(idx1, idx2);
+                                    changes = true;
+                                }
+                            }
+                        }
+                        // Pass 1: Odd rows (1, 3, 5...)
+                        for (let y = 1; y < height - 1; y += 2) {
+                            const rowOffset = y * width;
+                            const nextRowOffset = (y + 1) * width;
+                            for (let x = 0; x < width; x++) {
+                                const idx1 = rowOffset + x;
+                                const idx2 = nextRowOffset + x;
+                                if (weightData[idx1] < weightData[idx2]) {
+                                    swap(idx1, idx2);
+                                    changes = true;
+                                }
+                            }
+                        }
+                    } else {
+                        // Horizontal Pass (Compare x with x+1)
+                        // Pass 0: Even cols
+                        for (let y = 0; y < height; y++) {
+                            const rowOffset = y * width;
+                            for (let x = 0; x < width - 1; x += 2) {
+                                const idx1 = rowOffset + x;
+                                const idx2 = rowOffset + x + 1;
+                                // Heavy moves right
+                                if (weightData[idx1] < weightData[idx2]) {
+                                    swap(idx1, idx2);
+                                    changes = true;
+                                }
+                            }
+                        }
+                        // Pass 1: Odd cols
+                        for (let y = 0; y < height; y++) {
+                            const rowOffset = y * width;
+                            for (let x = 1; x < width - 1; x += 2) {
+                                const idx1 = rowOffset + x;
+                                const idx2 = rowOffset + x + 1;
+                                if (weightData[idx1] < weightData[idx2]) {
+                                    swap(idx1, idx2);
+                                    changes = true;
+                                }
+                            }
+                        }
+                    }
+
+                    // Update UI
+                    const newImageData = new ImageData(pixelData, width, height);
+                    ctx.putImageData(newImageData, 0, 0);
+
+                    // Check Stability
+                    if (changes) consecutiveIdleFrames = 0;
+                    else consecutiveIdleFrames++;
+
+                    if (consecutiveIdleFrames >= 4) { // Little buffer to ensure stability
+                        if (isRecordingMode) {
+                            loopState = 'outro';
+                            frameCount = 0;
+                        } else {
+                            // Non-recording mode ends here
+                            finishSortingOnly();
+                            return; 
+                        }
+                    } else {
+                        frameCount++;
+                        // Progress Bar
+                        const pct = Math.min(100, (frameCount / maxFrames) * 100);
+                        progressBar.style.width = `${pct}%`;
+                        statusText.textContent = `SORTING... FRAME ${frameCount}`;
+                    }
+                } 
+                else if (loopState === 'outro') {
+                    frameCount++;
+                    statusText.textContent = `RECORDING OUTRO (${Math.floor((frameCount/bufferFrames)*100)}%)`;
+                    if (frameCount >= bufferFrames) {
+                        finishRecording();
+                        return; // Stop Loop
+                    }
+                }
+
+                // Request next frame
+                animationId = requestAnimationFrame(step);
+            }
+
+            step();
+        }
+
+        function finishSortingOnly() {
+            isSorting = false;
+            statusText.textContent = "SORTING COMPLETE";
+            progressBar.style.width = '100%';
+            btnReset.disabled = false;
+            // No download button in sort-only mode
+        }
+
+        function finishRecording() {
+            isSorting = false;
+            statusText.textContent = "FINALIZING VIDEO...";
+            mediaRecorder.stop();
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                videoURL = URL.createObjectURL(blob);
+                statusText.textContent = "COMPLETE. DOWNLOAD READY.";
+                btnReset.disabled = false;
+                btnDownload.disabled = false;
+                progressBar.style.width = '100%';
+                progressBar.classList.add('bg-green-500');
+            };
+        }
+
+        function downloadVideo() {
+            if (!videoURL) return;
+            const a = document.createElement('a');
+            a.href = videoURL;
+            a.download = 'pixel_sort_result.webm';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                canvasWrapper.requestFullscreen().catch(err => {
+                    console.error(`Error attempting to enable fullscreen: ${err.message}`);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+    </script>
+</body>
+</html>
